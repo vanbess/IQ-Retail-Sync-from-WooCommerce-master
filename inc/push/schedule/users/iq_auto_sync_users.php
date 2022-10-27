@@ -38,20 +38,14 @@ endif;
 add_action('iq_auto_sync_users', function () {
 
     // add to log run time start
-    $time_start = strtotime('now');
-    file_put_contents(IQ_RETAIL_PATH . 'inc/push/logs/auto-sync/users/sync.log', 'User sync to IQ run start: ' . date('j F Y @ h:i:s', $time_start) . PHP_EOL, FILE_APPEND);
+    iq_logger('user_sync_times', 'User sync started', strtotime('now'));
 
     // sync users
     iq_auto_sync_new_users();
 
     // add to log run time end
-    $time_end = strtotime('now');
-    file_put_contents(IQ_RETAIL_PATH . 'inc/push/logs/auto-sync/users/sync.log', 'User sync to IQ run end: ' . date('j F Y @ h:i:s', $time_end) . PHP_EOL, FILE_APPEND);
-
-    // calculate total run time and add to log
-    $total_run_time = ($time_end - $time_start) / 60;
-    file_put_contents(IQ_RETAIL_PATH . 'inc/push/logs/auto-sync/users/sync.log', 'User sync to IQ run time: ' . $total_run_time . PHP_EOL, FILE_APPEND);
+    iq_logger('user_sync_times', 'User sync ended', strtotime('now'));
 
     // update last minor runtime
-    update_option('iq_last_auto_sync_users', $time_end);
+    update_option('iq_last_auto_sync_users', strtotime('now'));
 });

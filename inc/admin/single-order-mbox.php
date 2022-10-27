@@ -36,12 +36,14 @@ function iq_sync_single_order() {
     if (get_post_meta($order_id, '_iq_doc_number', true)) : ?>
 
         <!-- iq doc number -->
-        <p><b><i>IQ document number for this order:</i></b></p>
+        <p><b><i><u>IQ document number for this order:</u></i></b></p>
 
         <h3><i><?php echo get_post_meta($order_id, '_iq_doc_number', true); ?></i></h3>
 
+        <hr>
+
         <!-- sync order to iq -->
-        <p><b><i>Click to resync this order to IQ (NOTE: will create duplicate order on IQ):</i></b></p>
+        <p><b><i>Click to resync this order to IQ (NOTE: will create duplicate order on IQ as previously created orders cannot be overwritten):</i></b></p>
 
         <button id="iq-sync-order" class="button button-primary button-large" data-nonce="<?php echo wp_create_nonce('iq sync woo order to iq'); ?>" style="width: 100%; margin-bottom: 0;">Sync Order To IQ</button>
 

@@ -17,6 +17,12 @@ function iq_sync_single_user() {
     $user_id    = $order->get_user_id();
     $iq_user_id = 'WWW' . $user_id;
 
+    // if user has IQ user id meta, bail with message
+    if (get_user_meta($user_id, '_iq_user_id', true)) :
+        wp_send_json('This customer is already present on the IQ database, so this order can be safely synced to IQ if not synced already.');
+        wp_die();
+    endif;
+
     // retrieve iq settings
     $settings = maybe_unserialize(get_option('iq_settings'));
 
@@ -167,6 +173,11 @@ function iq_sync_single_user() {
             foreach ($error_arr as $err_data) :
                 $err_msg .= $err_data['error_description'];
             endforeach;
+
+            // if $err_msg = 'Duplicate Account Number', add user meta so that user isn't checked again
+            if ($err_msg == 'Duplicate Account Number') :
+                update_user_meta($user_id, '_iq_user_id', $iq_user_id);
+            endif;
 
             // add log
             iq_logger('single_user_sync_iq_error', 'Single user submission to IQ failed with the follow IQ error(s) for user ' . $iq_user_id . ': ' . $err_msg, strtotime('now'));

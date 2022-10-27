@@ -43,17 +43,12 @@ function iq_schedule_manual_sync_users() {
 add_action('iq_manual_sync_users', function () {
 
     // add to log run time start
-    $time_start = strtotime('now');
-    file_put_contents(IQ_RETAIL_PATH . 'inc/push/logs/manual-sync/users/sync.log', 'Manual user sync to IQ run start: ' . date('j F Y @ h:i:s', $time_start) . PHP_EOL, FILE_APPEND);
+    iq_logger('user_sync_times', 'User sync started', strtotime('now'));
 
     // update code gets executed from here
     iq_manual_sync_new_users();
 
     // add to log run time end
-    $time_end = strtotime('now');
-    file_put_contents(IQ_RETAIL_PATH . 'inc/push/logs/manual-sync/users/sync.log', 'Manual user sync to IQ run end: ' . date('j F Y @ h:i:s', $time_end) . PHP_EOL, FILE_APPEND);
+    iq_logger('user_sync_times', 'User sync ended', strtotime('now'));
 
-    // calculate total run time and add to log
-    $total_run_time = ($time_end - $time_start) / 60;
-    file_put_contents(IQ_RETAIL_PATH . 'inc/push/logs/manual-sync/users/sync.log', 'Total manual user sync to IQ run time in minutes: ' . $total_run_time . PHP_EOL, FILE_APPEND);
 });
