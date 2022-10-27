@@ -38,7 +38,7 @@ function iq_sync_single_order() {
         <!-- iq doc number -->
         <p><b><i>IQ document number for this order:</i></b></p>
 
-        <h4><?php echo get_post_meta($order_id, '_iq_doc_number', true); ?></h4>
+        <h3><i><?php echo get_post_meta($order_id, '_iq_doc_number', true); ?></i></h3>
 
         <!-- sync order to iq -->
         <p><b><i>Click to resync this order to IQ (NOTE: will create duplicate order on IQ):</i></b></p>
@@ -57,6 +57,10 @@ function iq_sync_single_order() {
         <button id="iq-sync-order" class="button button-primary button-large" data-nonce="<?php echo wp_create_nonce('iq sync woo order to iq'); ?>" style="width: 100%; margin-bottom: 0;">Sync Order To IQ</button>
     <?php endif; ?>
 
+    <!-- sync user to iq -->
+    <p><b><i>Click to sync this customer to IQ:</i></b></p>
+
+    <button id="iq-sync-user" class="button button-primary button-large" data-nonce="<?php echo wp_create_nonce('iq sync woo user to iq'); ?>" style="width: 100%; margin-bottom: 0;">Sync Customer To IQ</button>
 
     <!-- css -->
     <style>
@@ -88,9 +92,9 @@ function iq_sync_single_order() {
                 };
 
                 $.post(ajaxurl, data, function(response) {
-                    
+
                     $('#iq-check-status').text('Check IQ Status');
-                    
+
                     // console.log(response);
                     alert(response);
 
@@ -104,8 +108,8 @@ function iq_sync_single_order() {
             $('#iq-sync-order').click(function(e) {
                 e.preventDefault();
 
-                $(this).text('Syncing...');
-                
+                $(this).text('Attempting sync...');
+
                 var data = {
                     'action': 'iq_sync_order',
                     '_ajax_nonce': $(this).data('nonce'),
@@ -113,14 +117,15 @@ function iq_sync_single_order() {
                 };
 
                 $.post(ajaxurl, data, function(response) {
-                    
-                    if(response.success === false){
+
+                    if (response.success === false) {
                         alert(response.data);
-                    }else{
+                    } else {
                         alert(response);
+                        location.reload();
                     }
 
-                    $(this).text('Sync Order To IQ');
+                    $('#iq-sync-order').text('Sync Order To IQ');
                 });
 
             });
@@ -131,6 +136,8 @@ function iq_sync_single_order() {
             $('#iq-sync-user').click(function(e) {
                 e.preventDefault();
 
+                $(this).text('Attempting sync...');
+
                 var data = {
                     'action': 'iq_sync_single_user',
                     '_ajax_nonce': $(this).data('nonce'),
@@ -138,7 +145,15 @@ function iq_sync_single_order() {
                 };
 
                 $.post(ajaxurl, data, function(response) {
-                    console.log(response);
+                    
+                    if (response.success === false) {
+                        alert(response.data);
+                    } else {
+                        alert(response);
+                        location.reload();
+                    }
+
+                    $('#iq-sync-user').text('Sync Customer to IQ');
                 });
 
             });
