@@ -1,0 +1,115 @@
+"IQ_Submit_Data": {
+    "iq_root_json": {
+        "iq_identification_info": {
+            "company_code": "002",
+        },
+        "processing_documents": [
+            {
+                "export_class": "Sales_Order",
+                "document": {
+                    "delivery_address_information": [
+                        "addy_line_1",
+                        "addy_line_2",
+                        "addy_line_3",
+                        "addy_line_4",
+                    ]
+                },
+                "email_address": "bees@blaas.com",
+                // wc order number
+                "order_number": "123456",
+                // delivery type (deliver/collect)
+                "delivery_method": "DELIVER",
+                // total calculated vat here
+                "total_vat": 52.83,
+                // discount if applicable
+                "discount_amount": 0,
+                // bookpack meta here, else empty
+                "long_description": "",
+                // order total here
+                "document_total": 405,
+                "currency": "ZAR",
+                "telephone_number": "0214127800",
+                "vat_number": "423023409",
+                "postal_code": "8005",
+                "debtor_account": "WWW456789EG24",
+                "debtor_name": "Bees Blaas",
+                "sales_representative_number": 1,
+                "items": [
+                    {
+                        "stock_code": "9780636128484",
+                        "stock_description": "description here",
+                        "quantity": 1,
+                        "item_price_inclusive": 145,
+                    },
+                    {
+                        "stock_code": "9780636117938",
+                        "stock_description": "description here",
+                        "quantity": 1,
+                        "item_price_inclusive": 130,
+                    },
+                    // shipping item
+                    {
+                        "stock_code": "H020",
+                        "stock_description": "order shipping",
+                        "quantity": 1,
+                        "item_price_inclusive": 130,
+                    },
+                ]
+            },
+        ]
+    }
+}
+
+{
+    "export_class": "Sales_Order",
+    "document": {
+        "delivery_address_information": [
+            "14 Magnolia Street",
+            "",
+            "Sandton",
+            "2196"
+        ],
+        "email_address": "john.cairns@rmb.co.za",
+        "order_number": "16466",
+        "delivery_method": "National",
+        "total_vat": 61.96,
+        "discount_amount": 0,
+        "long_description": "Margaux Cairns, Redhill, Grade 8",
+        "document_total": 475,
+        "total_number_of_items": 2,
+        "currency": "ZAR",
+        "document_terms": "CAD",
+        "telephone_number": "0825712907",
+        "vat_number": "",
+        "postal_code": "",
+        "debtor_account": "WWW1464868",
+        "debtor_name": "John Cairns",
+        "sales_representative_number": 1,
+    },
+    "items": [
+        {
+            "stock_code": "9780636091931",
+            "stock_description": "",
+            "quantity": 1,
+            "item_price_inclusive": 188,
+        }
+        {
+            "stock_code": "9781250197023",
+            "stock_description": "",
+            "quantity": 1,
+            "item_price_inclusive": 195,
+        },
+        {
+            "stock_code": "9780620841078",
+            "stock_description": "",
+            "quantity": 1,
+            "item_price_inclusive": 355,
+        },
+        {
+            "stock_code": "H020",
+            "stock_description": "Shipping cost for order",
+            "quantity": 1,
+            "item_price_inclusive": 120,
+        }
+    ]
+}

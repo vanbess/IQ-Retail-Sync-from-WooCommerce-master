@@ -1,0 +1,42 @@
+"IQ_Submit_Data": {
+    "iq_root_json": {
+        "iq_identification_info": {
+            "company_code": "002",
+        },
+        "debtors_master": [
+            {
+                "export_class": "Debtor",
+                "postal_address_details": [
+                    "paddy1",
+                    "paddy2",
+                    "paddy3",
+                    "paddy4",
+                    "paddy5"
+                ],
+                "delivery_address_details": [
+                    "daddy1",
+                    "daddy2",
+                    "daddy3",
+                    "daddy4",
+                    "daddy5"
+                ],
+                "credit_limit": 0,
+                "telephone_numbers": [
+                    "9876543210",
+                    ""
+                ],
+                "cellphone_number": "1234567890",
+                "email_address": "bees@blaas.com",
+                "allow_use_of_email_address": true,
+                "debtor_account": "WWW456789EG24",
+                "debtor_name": "Bees Blaas",
+                "debtor_group": "D505",
+                "invoice_layout": 1,
+                "delivery_route": "R001",
+                "normal_representative": 1,
+                "terms": "CAD",
+                "vat_status": "Normal"
+            }
+        ]
+    }
+}
