@@ -57,7 +57,8 @@ function iq_sync_users() {
                                 ],
                                 'debtors_master' => []
                             ]
-                        ]
+                        ],
+                        "IQ_Overrides" => ["imeDuplicateAccount"]
                     ]
                 ]
             ];

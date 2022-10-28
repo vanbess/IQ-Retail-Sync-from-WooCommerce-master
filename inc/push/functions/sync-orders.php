@@ -539,7 +539,7 @@ function iq_sync_orders() {
         curl_close($curl);
 
         // sleep (experimental to see if problems with auto/manual bulk sync are resolved)
-        sleep(5);
+        sleep(30);
 
     endforeach;
 
