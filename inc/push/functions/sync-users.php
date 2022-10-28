@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Function to push new users to IQ
+ * Function to manually push new users to IQ
  */
-function iq_auto_sync_new_users() {
+function iq_sync_users() {
 
     // Retrieve WC customers
     $wc_customers = get_users([
@@ -125,7 +125,6 @@ function iq_auto_sync_new_users() {
                 $vat_status = $customer->get_shipping_country() == 'ZA' || $customer->get_shipping_country() == '' ? 'Normal' : 'Export';
 
             endif;
-
 
             // setup IQ customer data array 
             $iq_cust_data = [

@@ -4,9 +4,6 @@
  * SCHEDULE MANUAL MINOR SYNC (Woo to IQ)
  */
 
-// include function to sync orders to IQ manually
-include IQ_RETAIL_PATH . 'inc/push/functions/orders/fnc_iq_manual_sync_orders.php';
-
 /**
  * Schedule manual order sync via AJAX
  */
@@ -47,7 +44,7 @@ add_action('iq_manual_sync_orders', function () {
     iq_logger('order_sync_times', 'Order sync started', strtotime('now'));
 
     // update code gets executed from here
-    iq_manual_sync_orders_to_iq();
+    iq_sync_orders();
 
     // add to log run time end
     iq_logger('order_sync_times', 'Order sync ended', strtotime('now'));

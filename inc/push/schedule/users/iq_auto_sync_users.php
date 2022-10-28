@@ -4,9 +4,6 @@
  * SCHEDULE AUTO USER SYNC TO IQ
  ********************************/
 
-//  include function to run
-include IQ_RETAIL_PATH . 'inc/push/functions/users/fnc_iq_auto_sync_users.php';
-
 // check when minor sync was last run, else set last run time to now if not present
 $last_run = get_option('iq_last_auto_sync_users') ? get_option('iq_last_auto_sync_users') : strtotime('now');
 
@@ -41,7 +38,7 @@ add_action('iq_auto_sync_users', function () {
     iq_logger('user_sync_times', 'User sync started', strtotime('now'));
 
     // sync users
-    iq_auto_sync_new_users();
+    iq_sync_users();
 
     // add to log run time end
     iq_logger('user_sync_times', 'User sync ended', strtotime('now'));

@@ -4,9 +4,6 @@
  * Schedule manual user sync to IQ
  **********************************/
 
-// function to process manual user sync to IQ
-include IQ_RETAIL_PATH . 'inc/push/functions/users/fnc_iq_manual_sync_users.php';
-
 /**
  * AJAX function to schedule user sync to IQ
  */
@@ -45,8 +42,8 @@ add_action('iq_manual_sync_users', function () {
     // add to log run time start
     iq_logger('user_sync_times', 'User sync started', strtotime('now'));
 
-    // update code gets executed from here
-    iq_manual_sync_new_users();
+    // sync users
+    iq_sync_users();
 
     // add to log run time end
     iq_logger('user_sync_times', 'User sync ended', strtotime('now'));

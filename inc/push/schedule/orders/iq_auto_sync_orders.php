@@ -4,9 +4,6 @@
  * SCHEDULE AUTO ORDER SYNC 
  ***************************/
 
-// include function to sync orders to IQ manually
-include IQ_RETAIL_PATH . 'inc/push/functions/orders/fnc_iq_auto_sync_orders.php';
-
 // check when minor sync was last run, else set last run time to now if not present
 $last_run = get_option('iq_last_auto_sync_orders') ? get_option('iq_last_auto_sync_orders') : strtotime('now');
 
@@ -41,7 +38,7 @@ add_action('iq_auto_sync_orders', function () {
     iq_logger('order_sync_times', 'Order sync started', strtotime('now'));
 
     // sync orders
-    iq_auto_sync_orders_to_iq();
+    iq_sync_orders();
 
     // add to log run time end
     iq_logger('order_sync_times', 'Order sync ended', strtotime('now'));

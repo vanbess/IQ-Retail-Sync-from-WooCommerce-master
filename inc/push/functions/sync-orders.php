@@ -1,10 +1,10 @@
 <?php
 
-/*****************************
- * Manually sync orders to IQ
- *****************************/
+/***********************************
+ * Automatically sync orders to IQ
+ ***********************************/
 
-function iq_manual_sync_orders_to_iq() {
+function iq_sync_orders() {
 
     // retrieve iq settings
     $settings = maybe_unserialize(get_option('iq_settings'));
@@ -17,7 +17,7 @@ function iq_manual_sync_orders_to_iq() {
     // retrieve all orders for which meta key _iq_doc_number doesn't exist
     $order_q = new WP_Query([
         'post_type'      => 'shop_order',
-        'post_status'    => 'any',
+        'post_status'    => 'wc-processing',
         'posts_per_page' => -1,
         'meta_key'       => '_iq_doc_number',
         'meta_compare'   => 'NOT EXISTS',
@@ -44,7 +44,11 @@ function iq_manual_sync_orders_to_iq() {
      **************/
     foreach ($order_ids as $order_id) :
 
-        set_time_limit(30);
+        $order       = wc_get_order($order_id);
+        $customer_id = $order->get_customer_id();
+        $iq_user_id  = 'WWW' . $customer_id;
+
+        set_time_limit(45);
 
         /************************************************************************************************************
          * 1. CHECK WHETHER ORDER ALREADY EXISTS ON IQ; IF TRUE, UPDATE ORDER META WITH DOCUMENT NUMBER AND CONTINUE
@@ -128,6 +132,7 @@ function iq_manual_sync_orders_to_iq() {
                     $err_msg .= $err_data['error_description'];
                 endforeach;
 
+
                 // add log
                 iq_logger('order_check_error', 'Order ID ' . $order_id . ' could not be checked from IQ. IQ error(s): ' . $err_msg, strtotime('now'));
 
@@ -158,13 +163,6 @@ function iq_manual_sync_orders_to_iq() {
 
         // setup request url
         $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Request_GenericSQL';
-
-        // retrieve order object
-        $ord_obj = wc_get_order($order_id);
-
-        // retrieve order user id
-        $user_id    = $ord_obj->get_user_id();
-        $iq_user_id = 'WWW' . $user_id;
 
         // setup request payload
         $payload = [
@@ -279,7 +277,7 @@ function iq_manual_sync_orders_to_iq() {
         ];
 
         // retrieve products
-        $prods = $ord_obj->get_items();
+        $prods = $order->get_items();
 
         // array to hold order line items
         $order_items = [];
@@ -321,7 +319,7 @@ function iq_manual_sync_orders_to_iq() {
         endforeach;
 
         // retrieve shipping
-        $shipping = $ord_obj->get_items('shipping');
+        $shipping = $order->get_items('shipping');
         $shipping_name = '';
         $shipping_cost = '';
         foreach ($shipping as $ship_id => $item) :
@@ -356,38 +354,35 @@ function iq_manual_sync_orders_to_iq() {
         ];
 
         // retrieve delivery address info
-        $deladdy1 = $ord_obj->get_shipping_address_1();
-        $deladdy2 = $ord_obj->get_shipping_address_2();
-        $delcity  = $ord_obj->get_shipping_city();
-        $delprov  = $ord_obj->get_shipping_state();
-        $delpcode = $ord_obj->get_shipping_postcode();
-        $delphone = $ord_obj->get_shipping_phone();
-        $delemail = $ord_obj->get_billing_email();
+        $deladdy1 = $order->get_shipping_address_1();
+        $deladdy2 = $order->get_shipping_address_2();
+        $delcity  = $order->get_shipping_city();
+        $delprov  = $order->get_shipping_state();
+        $delpcode = $order->get_shipping_postcode();
+        $delphone = $order->get_shipping_phone();
+        $delemail = $order->get_billing_email();
 
         // retrieve order total
-        $order_total = $ord_obj->get_total();
+        $order_total = $order->get_total();
 
         // retrieve discount
-        $disc_amount = $ord_obj->get_discount_total();
+        $disc_amount = $order->get_discount_total();
 
         // work out discount percentage if applicable
         $disc_perc = $disc_amount > 0 ? number_format(1 / ($order_total / $disc_amount) * 100, 2, '.', '') : 0;
 
         // figure out discount type (coupon vs whatever else)
-        $coupons = $ord_obj->get_coupons();
+        $coupons = $order->get_coupons();
         $discount_type = !empty($coupons) ? 'Coupon(s)' : 'Unknown';
 
         // retrieve order currency
-        $currency = $ord_obj->get_currency();
+        $currency = $order->get_currency();
 
         // calculate total VAT
-        $vat_amt = $ord_obj->get_shipping_country() == 'ZA' ? $order_total - ($order_total / 1.15) : 0.00;
+        $vat_amt = $order->get_shipping_country() == 'ZA' ? $order_total - ($order_total / 1.15) : 0.00;
 
         // vat included or not
-        $vat_inc = $ord_obj->get_shipping_country() == 'ZA' ? true : false;
-
-        // setup debtor account
-        $debtor_acc = $ord_obj->get_user_id() != 0 ? 'WWW' . $ord_obj->get_user_id() : 'WWW1';
+        $vat_inc = $order->get_shipping_country() == 'ZA' ? true : false;
 
         // setup bookpack description if applicable
         $long_descr = get_post_meta($order_id, 'bookpack_id', true) ? get_the_title(get_post_meta($order_id, 'bookpack_id', true)) : '';
@@ -401,7 +396,7 @@ function iq_manual_sync_orders_to_iq() {
                     $deladdy1,
                     $deladdy2,
                     $delcity,
-                    WC()->countries->get_states($ord_obj->get_shipping_country())[$delprov]
+                    WC()->countries->get_states($order->get_shipping_country())[$delprov]
                 ],
                 "Email_Address"             => $delemail,
                 "Order_Number"              => $order_id,
@@ -413,7 +408,7 @@ function iq_manual_sync_orders_to_iq() {
                 "Discount_Amount"           => (float)number_format($disc_amount, 2, '.', ''),
                 "Long_Description"          => $long_descr,
                 "Document_Total"            => (float)number_format($order_total, 2, '.', ''),
-                "Total_Number_Of_Items"     => (int)$ord_obj->get_item_count('line-item'),
+                "Total_Number_Of_Items"     => (int)$order->get_item_count('line-item'),
                 "Document_Description"      => "",
                 "Print_Layout"              => 1,
                 "Warehouse"                 => "",
@@ -445,8 +440,8 @@ function iq_manual_sync_orders_to_iq() {
                         "Extra_Charge_Amount"      => 0
                     ],
                 ],
-                "Debtor_Account"              => $debtor_acc,
-                "Debtor_Name"                 => $ord_obj->get_billing_first_name() . ' ' . $ord_obj->get_billing_last_name(),
+                "Debtor_Account"              => $iq_user_id,
+                "Debtor_Name"                 => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
                 "Sales_Representative_Number" => 1,
                 "Order_Information"           => [
                     "Order_Date"             => get_the_date('Y-m-d', $order_id),
@@ -497,6 +492,12 @@ function iq_manual_sync_orders_to_iq() {
             // decode response
             $response = json_decode($response_json, true);
 
+            // response 429
+            if ($response['response_code'] == 429) :
+                wp_send_json_error($response['response_message']);
+                wp_die();
+            endif;
+
             // if iq did not return an error
             if ($response['iq_api_error'][0]['iq_error_code'] == 0) :
 
@@ -507,8 +508,8 @@ function iq_manual_sync_orders_to_iq() {
                 update_post_meta($order_id, '_iq_doc_number', $doc_number);
 
                 // add order note
-                $ord_obj->add_order_note('Order successfully synced to IQ. IQ document number: ' . $doc_number, 0, false);
-                $ord_obj->save();
+                $order->add_order_note('<b>Order successfully synced to IQ. IQ document number:</b><br> ' . $doc_number, 0, false);
+                $order->save();
 
                 // log
                 iq_logger('single_order_sync_success', 'Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $doc_number, strtotime('now'));
@@ -525,13 +526,20 @@ function iq_manual_sync_orders_to_iq() {
                     $err_msg .= $err_data['error_description'];
                 endforeach;
 
+                // add order note
+                $order->add_order_note('<b>Order automatic sync to IQ failed with the following error(s):</b><br> ' . $err_msg, 0, false);
+                $order->save();
+
                 // add log
-                iq_logger('single_order_sync_iq_error', 'Single order submission to IQ failed with the follow IQ error(s) for order ' . $order_id . ': ' . $err_msg, strtotime('now'));
+                iq_logger('single_order_sync_iq_error', 'Single order submission to IQ failed with the following IQ error(s) for order ' . $order_id . ': ' . $err_msg, strtotime('now'));
 
             endif;
         endif;
 
         curl_close($curl);
+
+        // sleep (experimental to see if problems with auto/manual bulk sync are resolved)
+        sleep(5);
 
     endforeach;
 

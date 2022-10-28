@@ -26,6 +26,12 @@ add_action('init', function () {
     // fetch function
     include IQ_RETAIL_PATH . 'inc/fetch/functions/iq_update_stock.php';
 
+    // sync users
+    include IQ_RETAIL_PATH . 'inc/push/functions/sync-users.php';
+
+    // sync orders
+    include IQ_RETAIL_PATH . 'inc/push/functions/sync-orders.php';
+
     // admin page
     include IQ_RETAIL_PATH . 'inc/admin/iq_admin.php';
 
@@ -88,5 +94,4 @@ add_action('init', function () {
             return;
         endif;
     }
-
 });
