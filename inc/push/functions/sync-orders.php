@@ -58,9 +58,6 @@ function iq_sync_orders() {
         // setup request url
         $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Request_GenericSQL';
 
-        // retrieve order id
-        $order_id = $_POST['order_id'];
-
         // retrieve order object
         $order = wc_get_order($order_id);
 
