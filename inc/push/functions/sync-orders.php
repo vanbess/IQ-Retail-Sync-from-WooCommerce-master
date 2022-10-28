@@ -44,6 +44,9 @@ function iq_sync_orders() {
      *******************/
     foreach ($order_ids as $order_id) :
 
+        // tempt set timeout limit to unlimited
+        set_time_limit(0);
+
         // retrieve iq settings
         $settings = maybe_unserialize(get_option('iq_settings'));
 
