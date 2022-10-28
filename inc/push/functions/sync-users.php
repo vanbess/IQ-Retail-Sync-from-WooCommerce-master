@@ -16,6 +16,8 @@ function iq_sync_users() {
 
         foreach ($wc_customers as $customer) :
 
+            // if(is_object(wc_get_customer_last_order($customer->ID))):
+
             // if user has IQ user id meta, continue to next iteration of loop
             if (get_user_meta($customer->ID, '_iq_user_id', true)) :
                 continue;
@@ -221,7 +223,7 @@ function iq_sync_users() {
                     endif;
 
                     // add log
-                    iq_logger('single_user_sync_iq_error', 'Single user submission to IQ failed with the follow IQ error(s) for user ' . $iq_user_id . ': ' . $err_msg, strtotime('now'));
+                    iq_logger('single_user_sync_iq_error', 'Single user submission to IQ failed with the following IQ error(s) for user ' . $iq_user_id . ': ' . $err_msg, strtotime('now'));
 
                 endif;
 
@@ -238,6 +240,9 @@ function iq_sync_users() {
 
             // close curl
             curl_close($curl);
+
+        // endif;
+
 
         endforeach;
     endif;

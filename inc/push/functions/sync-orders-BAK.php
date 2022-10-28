@@ -39,31 +39,130 @@ function iq_sync_orders() {
 
     endif;
 
-    /*******************
-     * ORDERS SYNC LOOP
-     *******************/
+    /**************
+     * ORDERS LOOP
+     **************/
     foreach ($order_ids as $order_id) :
 
-        // retrieve iq settings
-        $settings = maybe_unserialize(get_option('iq_settings'));
+        $order       = wc_get_order($order_id);
+        $customer_id = $order->get_customer_id();
+        $iq_user_id  = 'WWW' . $customer_id;
 
-        // setup basic auth
-        $basic_auth_raw = $settings['user-no'] . ':' . $settings['user-pass'];
-        $basic_auth     = base64_encode($basic_auth_raw);
-        $auth_string    = 'Basic ' . $basic_auth;
+        set_time_limit(0);
+
+        /************************************************************************************************************
+         * 1. CHECK WHETHER ORDER ALREADY EXISTS ON IQ; IF TRUE, UPDATE ORDER META WITH DOCUMENT NUMBER AND CONTINUE
+         ************************************************************************************************************/
 
         // setup request url
         $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Request_GenericSQL';
 
-        // retrieve order id
-        $order_id = $_POST['order_id'];
+        // setup payload
+        $payload = [
+            'IQ_API' => [
+                'IQ_API_Request_GenericSQL' => [
+                    'IQ_Company_Number'     => $settings['company-no'],
+                    'IQ_Terminal_Number'    => $settings['terminal-no'],
+                    'IQ_User_Number'        => $settings['user-no'],
+                    'IQ_User_Password'      => $settings['user-pass-api-key'],
+                    'IQ_Partner_Passphrase' => !empty($settings['passphrase']) ? $settings['passphrase'] : '',
+                    "IQ_SQL_Text"           => "SELECT document FROM sorders WHERE ordernum = '$order_id';"
+                ]
+            ]
+        ];
 
-        // retrieve order object
-        $order = wc_get_order($order_id);
+        // init curl
+        $curl = curl_init();
 
-        // retrieve order user id
-        $user_id    = $order->get_customer_id();
-        $iq_user_id = 'WWW' . $user_id;
+        // init curl options
+        curl_setopt_array($curl, array(
+            CURLOPT_URL            => $request_url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING       => '',
+            CURLOPT_MAXREDIRS      => 10,
+            CURLOPT_TIMEOUT        => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST  => 'POST',
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => array(
+                "Authorization: $auth_string",
+                'Content-Type: application/json'
+            ),
+        ));
+
+        // execute curl
+        $response = curl_exec($curl);
+
+        // if request successful
+        if (false !== $response) :
+
+            // decode response
+            $response = json_decode($response, true);
+
+            // if iq did not return an error
+            if ($response['iq_api_error']['iq_error_code'] == 0) :
+
+                // retrieve records
+                $records = $response['iq_api_result_data']['records'];
+
+                // if records, log, update and continue
+                if (!empty($records)) :
+
+                    // log
+                    iq_logger('orders_on_iq', 'Order ID ' . $order_id . ' is already present on IQ.', strtotime('now'));
+
+                    // update order meta with document number
+                    update_post_meta($order_id, '_iq_doc_number', $records['document']);
+
+                    // continue to next iteration of loop
+                    continue;
+
+                endif;
+
+            // if IQ error returned, retrieve error(s), log and continue on to next loop iteration
+            elseif ($response['iq_api_error']['iq_error_code'] != 0) :
+
+                // retrieve, combine and display/log/return error messages
+                $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['errors'];
+
+                $err_msg = '';
+
+                foreach ($error_arr as $err_data) :
+                    $err_msg .= $err_data['error_description'];
+                endforeach;
+
+
+                // add log
+                iq_logger('order_check_error', 'Order ID ' . $order_id . ' could not be checked from IQ. IQ error(s): ' . $err_msg, strtotime('now'));
+
+                continue;
+
+            endif;
+
+        // if curl request failed for some reason
+        else :
+
+            // retrieve error
+            $error = curl_error($curl);
+
+            // log
+            iq_logger('order_check_error', "Order check request (order ID $order_id) to IQ failed with the following error: $error.", strtotime('now'));
+
+            // continue
+            continue;
+
+        endif;
+
+        // close curl
+        curl_close($curl);
+
+        /*********************************************************************************************************
+         * 2. IF WE'RE STILL GOOD AT THIS POINT, CHECK WHETHER ORDER USER/CLIENT EXISTS ON IQ AND CONTINUE IF NOT
+         *********************************************************************************************************/
+
+        // setup request url
+        $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Request_GenericSQL';
 
         // setup request payload
         $payload = [
@@ -100,30 +199,19 @@ function iq_sync_orders() {
 
         $response_json = curl_exec($curl);
 
-        // request successful
+        // if request successful
         if (false !== $response_json) :
 
             $response = json_decode($response_json, true);
 
-            // response 429
-            if (isset($response['response_code'])) :
-
-                // add order note
-                $order->add_order_note('<b>Order customer check request error (code: ' . $response['response_code'] . ') :</b></br> ' . $response['response_message']);
-                $order->save();
-
-                continue;
-            endif;
-
             // if no iq error
             if ($response['iq_api_error'][0]['iq_error_code'] === 0) :
 
-                // if no customer records returned
+                // if no customer records returned, log and continue to next iteration of loop
                 if (empty($response['iq_api_result_data']['records'])) :
 
-                    // add order note
-                    $order->add_order_note('<b>Customer ID ' . $iq_user_id . ' does not exist on IQ. <br> Manual customer sync for this order required.</b>');
-                    $order->save();
+                    // order note
+                    $order->add_order_note('The customer for this order (Customer ID ' . $iq_user_id . ') does not exist on IQ - automatic sync to IQ aborted.<br> Please sync customer manually and then attempt to sync order again, or run bulk user sync from Tools -> IQ Retail page.');
 
                     // log
                     iq_logger('single_order_no_customer', 'The customer for order ID ' . $order_id . ' (Customer ID ' . $iq_user_id . ') does not exist on IQ. Order cannot be synced as a result.', strtotime('now'));
@@ -133,34 +221,38 @@ function iq_sync_orders() {
 
                 endif;
 
+            // if iq error
             elseif ($response['iq_api_error'][0]['iq_error_code'] !== 0) :
 
-                // retrieve errors
-                $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'];
+                // retrieve, combine and display/log/return error messages
+                $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['errors'];
 
-                // error message
-                $err_msg = '<b>Customer/debtor request to IQ failed with the following error(s):</b><br>';
-                $err_msg .= print_r($error_arr, true);
+                $err_msg = '';
 
-                // add errors to order notes
-                $order->add_order_note($err_msg);
-                $order->save();
+                foreach ($error_arr as $err_data) :
+                    $err_msg .= $err_data['error_description'];
+                endforeach;
+
+                // add log
+                iq_logger('order_customer_check_request_failure', 'Customer ID ' . $iq_user_id . ' could not be checked from IQ. IQ error(s): ' . $err_msg, strtotime('now'));
+
+                // continue
+                continue;
 
             endif;
 
-        // request failed
-        elseif (false === $response_json) :
+        // if request failed, log error and continue
+        else :
 
             $error = curl_error($curl);
-
-            $order->add_order_note('<b>(Order ID: ' . $order_id . ') Order user existence cURL request to IQ failed with the following error:<br> ' . $error . '</b>');
-            $order->save();
-
-            iq_logger('order_sync_curl_errs', '(Order ID: ' . $order_id . ') Order user existence request to IQ failed with the following cURL error: ' . $error, strtotime('now'));
-
+            iq_logger('order_customer_check_request_failure', 'Customer check request to IQ failed with the following error: ' . $error, strtotime('now'));
             continue;
 
         endif;
+
+        /*********************************************************************************************
+         * 3. IF WE'RE STILL GOLDEN AT THIS POINT, BUILD ORDER DATA SET AND SEND TO IQ FOR PROCESSING
+         *********************************************************************************************/
 
         // setup request url
         $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Submit_Document_Sales_Order';
@@ -190,8 +282,6 @@ function iq_sync_orders() {
         // retrieve products
         $prods = $order->get_items();
 
-        // file_put_contents(IQ_RETAIL_PATH . 'inc/push/files/orders/order_prods_obj.txt', print_r($prods, true), FILE_APPEND);
-
         // array to hold order line items
         $order_items = [];
 
@@ -220,10 +310,10 @@ function iq_sync_orders() {
                     "Volume_Rounding" => 0
                 ],
                 "Item_Price_Inclusive" => (float)get_post_meta($prod_id, '_regular_price', true),
-                "Item_Price_Exclusive" => (float)get_post_meta($prod_id, '_regular_price', true),
+                "Item_Price_Exclusive" => (float)number_format(get_post_meta($prod_id, '_regular_price', true) / 1.15, 2, '.', ''),
                 "Discount_Percentage"  => 0,
                 "Line_Total_Inclusive" => (float)$prod->get_total(),
-                "Line_Total_Exclusive" => (float)$prod->get_total() / 1.15,
+                "Line_Total_Exclusive" => (float)number_format($prod->get_total() / 1.15, 2, '.', ''),
                 "Custom_Cost"          => 0,
                 "List_Price"           => (float)get_post_meta($prod_id, '_regular_price', true),
                 "Invoiced_Quantity"    => 0
@@ -255,13 +345,13 @@ function iq_sync_orders() {
                 "volume_value"    => 0,
                 "volume_rounding" => 0
             ],
-            "item_price_inclusive" => (float)$shipping_cost,
-            "item_price_exclusive" => (float)$shipping_cost / 1.15,
+            "item_price_inclusive" => (float)number_format($shipping_cost, 2, '.', ''),
+            "item_price_exclusive" => (float)number_format($shipping_cost / 1.15, 2, '.', ''),
             "discount_percentage"  => 0,
-            "line_total_inclusive" => (float)$shipping_cost, 2,
-            "line_total_exclusive" => (float)$shipping_cost / 1.15,
+            "line_total_inclusive" => (float)number_format($shipping_cost, 2, '.', ''),
+            "line_total_exclusive" => (float)number_format($shipping_cost / 1.15, 2, '.', ''),
             "custom_cost"          => 0,
-            "list_price"           => (float)$shipping_cost,
+            "list_price"           => (float)number_format($shipping_cost, 2, '.', ''),
             "delcol"               => "",
             "invoiced_quantity"    => 0
         ];
@@ -282,7 +372,7 @@ function iq_sync_orders() {
         $disc_amount = $order->get_discount_total();
 
         // work out discount percentage if applicable
-        $disc_perc = $disc_amount > 0 ? 1 / ($order_total / $disc_amount) * 100 : 0;
+        $disc_perc = $disc_amount > 0 ? number_format(1 / ($order_total / $disc_amount) * 100, 2, '.', '') : 0;
 
         // figure out discount type (coupon vs whatever else)
         $coupons = $order->get_coupons();
@@ -297,7 +387,7 @@ function iq_sync_orders() {
         // vat included or not
         $vat_inc = $order->get_shipping_country() == 'ZA' ? true : false;
 
-        // setup bookpack description if application
+        // setup bookpack description if applicable
         $long_descr = get_post_meta($order_id, 'bookpack_id', true) ? get_the_title(get_post_meta($order_id, 'bookpack_id', true)) : '';
 
         // setup base order data array
@@ -315,12 +405,12 @@ function iq_sync_orders() {
                 "Order_Number"              => $order_id,
                 "Delivery_Method"           => $shipping_name,
                 "Delivery_Note_Number"      => "",
-                "Total_Vat"                 => (float)$vat_amt,
+                "Total_Vat"                 => (float)number_format($vat_amt, 2, '.', ''),
                 "Discount_Percentage"       => (float)$disc_perc,
                 "Discount_Type"             => $discount_type,
-                "Discount_Amount"           => (float)$disc_amount,
+                "Discount_Amount"           => (float)number_format($disc_amount, 2, '.', ''),
                 "Long_Description"          => $long_descr,
-                "Document_Total"            => (float)$order_total,
+                "Document_Total"            => (float)number_format($order_total, 2, '.', ''),
                 "Total_Number_Of_Items"     => (int)$order->get_item_count('line-item'),
                 "Document_Description"      => "",
                 "Print_Layout"              => 1,
@@ -370,6 +460,9 @@ function iq_sync_orders() {
         // push $base_order_data to Processing_Documents key in $payload
         $payload['IQ_API']['IQ_API_Submit_Document_Sales_Order']['IQ_Submit_Data']['IQ_Root_JSON']['Processing_Documents'] = $base_order_data;
 
+        // log payload to file for debugging/troubleshooting
+        iq_filer('sorder_reqquest_data_'.$order_id, json_encode($payload));
+
         /**
          * SEND REQUEST
          */
@@ -394,23 +487,25 @@ function iq_sync_orders() {
         $response_json = curl_exec($curl);
 
         // if request fails, send error message back and log
-        if ($response_json !== false) :
+        if ($response_json === false) :
+
+            $error = curl_error($curl);
+            iq_logger('single_order_sync_iq_error', 'Connection to IQ failed with the following error (Order ID:' . $order_id . '): ' . $error, strtotime('now'));
+
+        // if request successful, write response to file
+        else :
 
             // decode response
             $response = json_decode($response_json, true);
 
+            // response 429
+            if ($response['response_code'] == 429) :
+                wp_send_json_error($response['response_message']);
+                wp_die();
+            endif;
+
             // if iq did not return an error
             if ($response['iq_api_error'][0]['iq_error_code'] == 0) :
-
-                // response 429
-                if (isset($response['response_code'])) :
-
-                    // add order note
-                    $order->add_order_note('<b>Order auto sync request error (code: ' . $response['response_code'] . ') :</b></br> ' . $response['response_message']);
-                    $order->save();
-
-                    continue;
-                endif;
 
                 // find document number 
                 $doc_number = $response['iq_api_success']['iq_api_success_items'][0][0]['data'];
@@ -419,49 +514,38 @@ function iq_sync_orders() {
                 update_post_meta($order_id, '_iq_doc_number', $doc_number);
 
                 // add order note
-                $order->add_order_note('<b>Order successfully synced to IQ.<br> IQ document number:</b><br> ' . $doc_number, 0, false);
+                $order->add_order_note('<b>Order successfully synced to IQ. IQ document number:</b><br> ' . $doc_number, 0, false);
                 $order->save();
 
                 // log
                 iq_logger('single_order_sync_success', 'Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $doc_number, strtotime('now'));
 
-                // return success message
-                wp_send_json('Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $doc_number . '.');
-
             // if IQ error returned
             elseif ($response['iq_api_error'][0]['iq_error_code'] != 0) :
 
-                // retrieve errors
-                $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'];
+                // retrieve, combine and display/log/return error messages
+                $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['errors'];
 
-                // error message
-                $err_msg = '<b>Order sync request to IQ failed with the following error(s):</b><br>';
-                $err_msg .= print_r($error_arr, true);
+                $err_msg = '';
 
-                // add errors to order notes
-                $order->add_order_note($err_msg);
+                foreach ($error_arr as $err_data) :
+                    $err_msg .= $err_data['error_description'];
+                endforeach;
+
+                // add order note
+                $order->add_order_note('<b>Order automatic sync to IQ failed with the following error(s):</b><br> ' . $err_msg, 0, false);
                 $order->save();
 
                 // add log
-                iq_logger('single_order_sync_iq_error', 'Single order submission to IQ failed with the follow IQ error(s) for order ' . $order_id . ': ' . $err_msg, strtotime('now'));
+                iq_logger('single_order_sync_iq_error', 'Single order submission to IQ failed with the following IQ error(s) for order ' . $order_id . ': ' . $err_msg, strtotime('now'));
 
             endif;
-
-        // if request successful, write response to file and order notes
-        elseif ($response_json === false) :
-
-            $error = curl_error($curl);
-
-            $order->add_order_note('<b>(Order ID: ' . $order_id . ') Order sync cURL request to IQ failed with the following error:<br> ' . $error . '</b>');
-            $order->save();
-
-            iq_logger('order_sync_curl_errs', '(Order ID ' . $order_id . ') Final sales order sync request to IQ failed with the following cURL error: ' . $error, strtotime('now'));
-
         endif;
+
         curl_close($curl);
 
         // sleep (experimental to see if problems with auto/manual bulk sync are resolved)
-        sleep(5);
+        sleep(15);
 
     endforeach;
 
