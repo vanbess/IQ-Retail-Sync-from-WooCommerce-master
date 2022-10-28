@@ -274,7 +274,7 @@ function iq_sync_order() {
             "Cashier_Number"            => 1,
             "Till_Number"               => 1,
             "Document_Includes_VAT"     => $vat_inc,
-            "Currency"                  => "",
+            "Currency"                  => $currency,
             "Currency_Rate"             => $currency == 'ZAR' ? 1 : "",
             "Internal_Order_Number"     => "",
             "Store_Department"          => "",
@@ -356,8 +356,11 @@ function iq_sync_order() {
         // if iq did not return an error
         if ($response['iq_api_error'][0]['iq_error_code'] == 0) :
 
-            print_r($response);
-            wp_die();
+            // response 429
+            if ($response['response_code'] == 429) :
+                wp_send_json_error($response['response_message']);
+                wp_die();
+            endif;
 
             // find document number 
             $doc_number = $response['iq_api_success']['iq_api_success_items'][0][0]['data'];

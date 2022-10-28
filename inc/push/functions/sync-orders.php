@@ -415,7 +415,7 @@ function iq_sync_orders() {
                 "Cashier_Number"            => 1,
                 "Till_Number"               => 1,
                 "Document_Includes_VAT"     => $vat_inc,
-                "Currency"                  => "",
+                "Currency"                  => $currency,
                 "Currency_Rate"             => $currency == 'ZAR' ? 1 : "",
                 "Internal_Order_Number"     => "",
                 "Store_Department"          => "",

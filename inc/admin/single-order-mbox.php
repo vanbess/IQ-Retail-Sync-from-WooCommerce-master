@@ -111,11 +111,6 @@ function iq_sync_single_order() {
 
                 $.post(ajaxurl, data, function(response) {
 
-console.log(response);
-
-return;
-
-
                     if (response.success === false) {
                         alert(response.data);
                     } else {

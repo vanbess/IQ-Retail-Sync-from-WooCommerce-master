@@ -206,7 +206,7 @@ function iq_retail_rest() {
             </p>
 
             <h4 style="width: 400px; background: lightgrey; padding: 10px; font-size: 15px; box-sizing: border-box; margin-top: 35px; box-shadow: 0px 2px 2px grey;">
-                Syncronisation settings
+                Synchronization settings
             </h4>
 
             <!-- enable auto major sync -->

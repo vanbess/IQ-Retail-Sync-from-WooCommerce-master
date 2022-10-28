@@ -157,7 +157,8 @@ function iq_sync_users() {
                 "delivery_route"             => "R001",
                 "normal_representative"      => 1,
                 "terms"                      => "CAD",
-                "vat_status"                 => $vat_status
+                "vat_status"                 => $vat_status,
+                "currency"                   => "ZAR"
             ];
 
             // push $iq_cust_data to $user_data_arr
