@@ -44,17 +44,11 @@ function iq_schedule_manual_sync_orders() {
 add_action('iq_manual_sync_orders', function () {
 
     // add to log run time start
-    $time_start = strtotime('now');
-    file_put_contents(IQ_RETAIL_PATH . 'functions/push/logs/manual-sync/orders/orders.log', 'Order sync run start: ' . date('j F Y @ h:i:s', $time_start) . PHP_EOL, FILE_APPEND);
+    iq_logger('order_sync_times', 'Order sync started', strtotime('now'));
 
     // update code gets executed from here
     iq_manual_sync_orders_to_iq();
 
     // add to log run time end
-    $time_end = strtotime('now');
-    file_put_contents(IQ_RETAIL_PATH . 'functions/push/logs/manual-sync/orders/orders.log', 'Order sync run end: ' . date('j F Y @ h:i:s', $time_end) . PHP_EOL, FILE_APPEND);
-
-    // calculate total run time and add to log
-    $total_run_time = ($time_end - $time_start) / 60;
-    file_put_contents(IQ_RETAIL_PATH . 'functions/push/logs/manual-sync/orders/orders.log', 'Order sync run time in minutes: ' . $total_run_time . PHP_EOL, FILE_APPEND);
+    iq_logger('order_sync_times', 'Order sync ended', strtotime('now'));
 });

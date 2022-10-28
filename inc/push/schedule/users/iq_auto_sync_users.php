@@ -1,10 +1,10 @@
 <?php
 
-/*****************************************
- * Schedule periodic auto user sync to IQ
- *****************************************/
+/********************************
+ * SCHEDULE AUTO USER SYNC TO IQ
+ ********************************/
 
-//  function to run
+//  include function to run
 include IQ_RETAIL_PATH . 'inc/push/functions/users/fnc_iq_auto_sync_users.php';
 
 // check when minor sync was last run, else set last run time to now if not present
@@ -28,7 +28,7 @@ endif;
 if ($last_run && false === as_has_scheduled_action('iq_auto_sync_users')) :
 
     // schedule action
-    $auto_sync_users = as_schedule_single_action($last_run + $sync_run_interval, 'iq_auto_sync_users', [], 'iq_api_sync');
+    as_schedule_single_action($last_run + $sync_run_interval, 'iq_auto_sync_users', [], 'iq_api_sync');
 
 endif;
 
