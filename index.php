@@ -21,7 +21,7 @@ add_action('init', function () {
     define('IQ_RETAIL_URL', plugin_dir_url(__FILE__));
 
     // action scheduler lib
-    require_once IQ_RETAIL_PATH . 'lib/vendor/autoload.php';
+    // require_once IQ_RETAIL_PATH . 'lib/vendor/autoload.php';
 
     // fetch function
     include IQ_RETAIL_PATH . 'inc/fetch/functions/iq_update_stock.php';

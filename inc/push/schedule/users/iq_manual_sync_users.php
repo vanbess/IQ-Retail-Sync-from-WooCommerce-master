@@ -17,7 +17,7 @@ function iq_schedule_manual_sync_users() {
     $scheduled_id = '';
 
     // if run not scheduled, schedule run immediately
-    if (false === as_has_scheduled_action('iq_manual_sync_users')) :
+    if (false === as_has_scheduled_action('iq_manual_sync_users') && function_exists('as_has_scheduled_action')) :
 
         // schedule action
         $scheduled_id = as_schedule_single_action(strtotime('now'), 'iq_manual_sync_users', [], 'iq_api_sync');
@@ -47,5 +47,4 @@ add_action('iq_manual_sync_users', function () {
 
     // add to log run time end
     iq_logger('user_sync_times', 'User sync ended', strtotime('now'));
-
 });

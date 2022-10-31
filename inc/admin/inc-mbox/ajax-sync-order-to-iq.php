@@ -250,7 +250,7 @@ function iq_sync_order() {
     $base_order_data[] = [
         "Export_Class" => "Sales_Order",
         "Document"     => [
-            "Document_Number"              => "",
+            "Document_Number"              => "SAL".$order_id,
             "Delivery_Address_Information" => [
                 $deladdy1,
                 $deladdy2,

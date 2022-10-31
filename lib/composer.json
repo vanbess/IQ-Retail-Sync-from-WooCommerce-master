@@ -1,5 +1,0 @@
-{
-    "require": {
-        "woocommerce/action-scheduler": "^3.5"
-    }
-}

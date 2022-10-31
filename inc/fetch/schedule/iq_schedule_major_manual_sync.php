@@ -15,7 +15,7 @@ function iq_schedule_major_manual_sync() {
     $major_manual_scheduled = '';
 
     // if $time_now > $last_run + $sync_run_interval, and run not scheduled, schedule run
-    if (false === as_has_scheduled_action('iq_manual_major_sync')) :
+    if (false === as_has_scheduled_action('iq_manual_major_sync') && function_exists('as_has_scheduled_action')) :
 
         // schedule action
         $major_manual_scheduled = as_schedule_single_action(strtotime('now'), 'iq_manual_major_sync', [], 'iq_api_sync');

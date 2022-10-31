@@ -304,7 +304,7 @@ function iq_sync_orders() {
         $base_order_data[] = [
             "Export_Class" => "Sales_Order",
             "Document"     => [
-                "Document_Number"              => "",
+                "Document_Number"              => "SAL".$order_id,,
                 "Delivery_Address_Information" => [
                     $deladdy1,
                     $deladdy2,
@@ -461,7 +461,7 @@ function iq_sync_orders() {
         curl_close($curl);
 
         // sleep (experimental to see if problems with auto/manual bulk sync are resolved)
-        sleep(5);
+        sleep(1);
 
     endforeach;
 

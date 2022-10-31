@@ -22,7 +22,7 @@ if ($iq_settings['enable-order-sync'] != 'yes') :
 endif;
 
 // if $time_now > $last_run + $sync_run_interval, and run not scheduled, schedule run
-if ($last_run && false === as_has_scheduled_action('iq_auto_sync_orders')) :
+if ($last_run && false === as_has_scheduled_action('iq_auto_sync_orders') && function_exists('as_has_scheduled_action')) :
 
     // schedule action
     as_schedule_single_action($last_run + $sync_run_interval, 'iq_auto_sync_orders', [], 'iq_api_sync');

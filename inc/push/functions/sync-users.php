@@ -5,40 +5,143 @@
  */
 function iq_sync_users() {
 
+    // retrieve iq settings
+    $settings = maybe_unserialize(get_option('iq_settings'));
+
+    // setup basic auth
+    $basic_auth_raw = $settings['user-no'] . ':' . $settings['user-pass'];
+    $basic_auth     = base64_encode($basic_auth_raw);
+    $auth_string    = 'Basic ' . $basic_auth;
+
+    // request url
+    $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Request_GenericSQL';
+
+    // setup payload
+    $payload = [
+        'IQ_API' => [
+            'IQ_API_Request_GenericSQL' => [
+                'IQ_Company_Number'     => $settings['company-no'],
+                'IQ_Terminal_Number'    => $settings['terminal-no'],
+                'IQ_User_Number'        => $settings['user-no'],
+                'IQ_User_Password'      => $settings['user-pass-api-key'],
+                'IQ_Partner_Passphrase' => !empty($settings['passphrase']) ? $settings['passphrase'] : '',
+                "IQ_SQL_Text"           => "SELECT account FROM debtors WHERE account LIKE '%WWW%';"
+            ]
+        ]
+    ];
+
+    // **************************
+    // Retrieve current IQ users
+    // **************************
+    $ext_users = [];
+
+    // init request to retrieve existing IQ users
+    $curl = curl_init();
+
+    curl_setopt_array($curl, array(
+        CURLOPT_URL            => $request_url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING       => '',
+        CURLOPT_MAXREDIRS      => 10,
+        CURLOPT_TIMEOUT        => 0,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST  => 'POST',
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_HTTPHEADER => array(
+            'Authorization: ' . $auth_string,
+            'Content-Type: application/json'
+        ),
+    ));
+
+    $response_js = curl_exec($curl);
+
+    // iq request fails, log and bail
+    if ($response_js == false) :
+
+        iq_logger('user_sync', 'User list request to IQ failed with the following error: ' . curl_error($curl), strtotime('now'));
+        return;
+
+    // if request succeeds
+    else :
+
+        // decode
+        $response = json_decode($response_js, true);
+
+        // if IQ error code, log and bail
+        if ($response['iq_api_error']['iq_error_code'] > 0) :
+
+            // log
+            iq_logger('user_sync', 'Request to IQ returned the following error code: ' . $response['iq_api_error']['iq_error_code'], strtotime('now'));
+
+            // retrieve errors
+            // $errors = array_intersect_key(['errors'], $response);
+
+            return;
+
+        // if no IQ error code
+        else :
+
+            // loop to extract ext users and push to $ext_users
+            $iq_users = $response['iq_api_result_data']['records'];
+
+            foreach ($iq_users as $user_data) :
+
+                // format user acc number to match WP user ID format
+                $user_id = str_replace('WWW', '', $user_data['account']);
+
+                // push
+                $ext_users[] = $user_id;
+
+            endforeach;
+
+        endif;
+
+    endif;
+
+    // close curl
+    curl_close($curl);
+
     // Retrieve WC customers
     $wc_customers = get_users([
         'role'    => 'customer',
         'orderby' => 'ID'
     ]);
 
+    // if $ext_users empty for some reason, bail because then we know theres been an error
+    if (empty($ext_users)) :
+        iq_logger('user_sync', 'User sync could not be completed because failed to retrieve existing users from IQ.', strtotime('now'));
+        return;
+    endif;
+
+    // write $ext_users to file for later ref
+    iq_filer('users_ext', json_encode($ext_users));
+
+    file_put_contents(IQ_RETAIL_PATH . 'logs-files/users_ext.txt', print_r($ext_users, true), FILE_APPEND);
+
     // loop through customers and send sync request for each
     if (is_object($wc_customers) || is_array($wc_customers) && !empty($wc_customers)) :
 
         foreach ($wc_customers as $customer) :
 
-            // if(is_object(wc_get_customer_last_order($customer->ID))):
+            // set time limit for each iteration of the loop, just in case
+            set_time_limit(30);
+
+            // if customer id in $ext_users, continue
+            if (in_array($customer->ID, $ext_users)) :
+                continue;
+            endif;
 
             // if user has IQ user id meta, continue to next iteration of loop
             if (get_user_meta($customer->ID, '_iq_user_id', true)) :
                 continue;
             endif;
 
-            // set time limit for each iteration of the loop, just in case
-            set_time_limit(30);
-
             // retrieve last customer order
             $last_order = wc_get_customer_last_order($customer->ID);
 
             // setup user IQ id
             $iq_user_id = 'WWW' . $customer->ID;
-
-            // retrieve iq settings
-            $settings = maybe_unserialize(get_option('iq_settings'));
-
-            // setup basic auth
-            $basic_auth_raw = $settings['user-no'] . ':' . $settings['user-pass'];
-            $basic_auth     = base64_encode($basic_auth_raw);
-            $auth_string    = 'Basic ' . $basic_auth;
 
             // setup request url
             $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Submit_Debtor';
@@ -203,7 +306,10 @@ function iq_sync_users() {
                 if ($response['iq_api_error'][0]['iq_error_code'] === 0) :
 
                     // add log
-                    iq_logger('single_user_sync_success', 'Single user sync to IQ successful for user ' . $iq_user_id, strtotime('now'));
+                    iq_logger('user_sync', 'Single user sync to IQ successful for user ' . $iq_user_id, strtotime('now'));
+
+                    // update user meta with IQ account number so that user is skipped going forward
+                    update_user_meta($customer->ID, '_iq_user_id', $iq_user_id);
 
                 // if unable to sync user
                 elseif ($response['iq_api_error'][0]['iq_error_code'] !== 0) :
@@ -223,7 +329,7 @@ function iq_sync_users() {
                     endif;
 
                     // add log
-                    iq_logger('single_user_sync_iq_error', 'Single user submission to IQ failed with the following IQ error(s) for user ' . $iq_user_id . ': ' . $err_msg, strtotime('now'));
+                    iq_logger('user_sync', 'Single user submission to IQ failed with the following IQ error(s) for user ' . $iq_user_id . ': ' . $err_msg, strtotime('now'));
 
                 endif;
 
