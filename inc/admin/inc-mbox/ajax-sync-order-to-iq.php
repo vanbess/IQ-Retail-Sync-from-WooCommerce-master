@@ -27,9 +27,56 @@ function iq_sync_order() {
     // retrieve order object
     $order = wc_get_order($order_id);
 
-    // retrieve order user id
-    $user_id    = $order->get_customer_id();
-    $iq_user_id = 'WWW' . $user_id;
+    // retrieve order user email; if user does not exist with email, create user
+    $user_id = get_post_meta($order_id, '_customer_user', true);
+
+    // if user ID is 0, it means the user hasn't registered, and we need to register the user
+    if ($user_id == 0) :
+
+        // retrieve billing email
+        $email = $order->get_billing_email();
+
+        // create new customer/user 
+        $user_id = wc_create_new_customer($email, '', '', array(
+            'first_name' => $order->get_billing_first_name(),
+            'last_name'  => $order->get_billing_last_name(),
+        ));
+
+        // sync past orders
+        wc_update_new_customer_past_orders($user_id);
+
+        // update user's billing data
+        update_user_meta($user_id, 'billing_address_1', $order->billing_address_1);
+        update_user_meta($user_id, 'billing_address_2', $order->billing_address_2);
+        update_user_meta($user_id, 'billing_city', $order->billing_city);
+        update_user_meta($user_id, 'billing_company', $order->billing_company);
+        update_user_meta($user_id, 'billing_country', $order->billing_country);
+        update_user_meta($user_id, 'billing_email', $order->billing_email);
+        update_user_meta($user_id, 'billing_first_name', $order->billing_first_name);
+        update_user_meta($user_id, 'billing_last_name', $order->billing_last_name);
+        update_user_meta($user_id, 'billing_phone', $order->billing_phone);
+        update_user_meta($user_id, 'billing_postcode', $order->billing_postcode);
+        update_user_meta($user_id, 'billing_state', $order->billing_state);
+
+        // update user's shipping data
+        update_user_meta($user_id, 'shipping_address_1', $order->shipping_address_1);
+        update_user_meta($user_id, 'shipping_address_2', $order->shipping_address_2);
+        update_user_meta($user_id, 'shipping_city', $order->shipping_city);
+        update_user_meta($user_id, 'shipping_company', $order->shipping_company);
+        update_user_meta($user_id, 'shipping_country', $order->shipping_country);
+        update_user_meta($user_id, 'shipping_first_name', $order->shipping_first_name);
+        update_user_meta($user_id, 'shipping_last_name', $order->shipping_last_name);
+        update_user_meta($user_id, 'shipping_method', $order->shipping_method);
+        update_user_meta($user_id, 'shipping_postcode', $order->shipping_postcode);
+        update_user_meta($user_id, 'shipping_state', $order->shipping_state);
+
+        // setup custom iq reference
+        $iq_user_id = 'WWW' . $user_id;
+
+    // if $user_id exists, format for use with IQ
+    else :
+        $iq_user_id = 'WWW' . $user_id;
+    endif;
 
     // setup request payload
     $payload = [

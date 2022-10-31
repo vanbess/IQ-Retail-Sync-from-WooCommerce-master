@@ -13,6 +13,10 @@ function iq_sync_users() {
     $basic_auth     = base64_encode($basic_auth_raw);
     $auth_string    = 'Basic ' . $basic_auth;
 
+    // **************************
+    // Retrieve current IQ users
+    // **************************
+
     // request url
     $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Request_GenericSQL';
 
@@ -29,10 +33,6 @@ function iq_sync_users() {
             ]
         ]
     ];
-
-    // **************************
-    // Retrieve current IQ users
-    // **************************
     $ext_users = [];
 
     // init request to retrieve existing IQ users
@@ -72,7 +72,7 @@ function iq_sync_users() {
         if ($response['iq_api_error']['iq_error_code'] > 0) :
 
             // log
-            iq_logger('user_sync', 'Request to IQ returned the following error code: ' . $response['iq_api_error']['iq_error_code'], strtotime('now'));
+            iq_logger('user_sync', 'User list request to IQ returned the following error code: ' . $response['iq_api_error']['iq_error_code'], strtotime('now'));
 
             // retrieve errors
             // $errors = array_intersect_key(['errors'], $response);
