@@ -40,11 +40,11 @@ function iq_schedule_manual_sync_users() {
 add_action('iq_manual_sync_users', function () {
 
     // add to log run time start
-    iq_logger('user_sync_times', 'User sync started', strtotime('now'));
+    iq_logger('user_sync', 'User sync started', strtotime('now'));
 
     // sync users
     iq_sync_users();
 
     // add to log run time end
-    iq_logger('user_sync_times', 'User sync ended', strtotime('now'));
+    iq_logger('user_sync', 'User sync ended', strtotime('now'));
 });

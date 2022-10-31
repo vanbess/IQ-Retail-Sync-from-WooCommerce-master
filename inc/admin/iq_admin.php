@@ -15,8 +15,6 @@ function iq_retail_rest() {
     $settings = unserialize($settings);
 
 ?>
-
-
     <div>
 
         <h1 style="background: white; padding: 15px 20px; margin-top: 0; margin-left: -19px !important; box-shadow: 0px 2px 4px lightgrey;">
@@ -53,6 +51,11 @@ function iq_retail_rest() {
             <?php else : ?>
 
                 <span id="iq-schedule-links" style="float: right; position: relative; bottom: 6px;">
+
+                    <!-- reset order iq meta -->
+                    <a href="" id="iq-reset-orders" style="text-transform: uppercase;" class="button button-primary button-medium" title="click to reset all iq related order meta. useful if you want to resync orders to iq from scratch.">
+                        Reset Order Meta
+                    </a>
 
                     <!-- test connectivity -->
                     <a href="" id="iq-test-connectivity" style="text-transform: uppercase;" class="button button-primary button-medium" title="click to test connectivity to IQ server">
@@ -362,7 +365,73 @@ function iq_retail_rest() {
                 });
 
             });
+
+            // reset order iq meta
+            $('#iq-reset-orders').click(function(e) {
+                e.preventDefault();
+
+                $(this).text('Working...');
+
+                var data = {
+                    'action': 'iq_reset_order_meta',
+                    '_ajax_nonce': '<?php echo wp_create_nonce('iq reset order meta') ?>'
+                };
+
+                $.post(ajaxurl, data, function(response) {
+                    alert(response);
+                    $('#iq-reset-orders').text('Reset Order Meta');
+                });
+
+            });
         });
     </script>
 
 <?php }
+
+/**
+ * AJAX to reset all IQ related meta for orders
+ */
+add_action('wp_ajax_nopriv_iq_reset_order_meta', 'iq_reset_order_meta');
+add_action('wp_ajax_iq_reset_order_meta', 'iq_reset_order_meta');
+
+function iq_reset_order_meta() {
+
+    check_ajax_referer('iq reset order meta');
+
+    // retrieve all orders for which meta key _iq_doc_number doesn't exist
+    $order_q = new WP_Query([
+        'post_type'      => 'shop_order',
+        'post_status'    => 'wc-processing',
+        'posts_per_page' => -1,
+        'meta_key'       => '_iq_doc_number',
+        'meta_compare'   => 'EXISTS',
+        'fields'         => 'ids'
+    ]);
+
+    $order_ids = $order_q->posts;
+
+    $deleted = [];
+
+    /**
+     * If no order ids returned, bail with log message
+     */
+    if (empty($order_ids)) :
+
+        wp_send_json('No orders with relevant IQ meta data found.');
+
+    else :
+
+        foreach ($order_ids as $order_id) :
+            // $deleted[] =  $order_id;
+            $deleted[] =  delete_post_meta($order_id, '_iq_doc_number');
+        endforeach;
+
+        if (!empty($deleted)) :
+            // wp_send_json($deleted);
+            wp_send_json('Orders have been reset successfully. Note: this does NOT delete any order notes previously added which relates to IQ.');
+        endif;
+
+    endif;
+
+    wp_die();
+}

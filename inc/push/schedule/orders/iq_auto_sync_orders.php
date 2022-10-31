@@ -35,7 +35,7 @@ endif;
 add_action('iq_auto_sync_orders', function () {
 
     // add to log run time start
-    iq_logger('order_sync_times', 'Order sync started', strtotime('now'));
+    iq_logger('order_sync', 'Order sync started', strtotime('now'));
 
     // sync orders
     iq_sync_orders();

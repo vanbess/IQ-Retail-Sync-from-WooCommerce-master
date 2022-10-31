@@ -8,6 +8,13 @@ add_action('wp_ajax_iq_sync_order', 'iq_sync_order');
 
 function iq_sync_order() {
 
+    // reset $payload
+    $payload     = '';
+    $request_url = '';
+    $curl        = '';
+    $response    = '';
+    $response_js = '';
+
     check_ajax_referer('iq sync woo order to iq');
 
     // retrieve iq settings
@@ -131,7 +138,7 @@ function iq_sync_order() {
             if (empty($response['iq_api_result_data']['records'])) :
 
                 // log
-                iq_logger('single_order_no_customer', 'The customer for order ID ' . $order_id . ' (Customer ID ' . $iq_user_id . ') does not exist on IQ. Order cannot be synced as a result.', strtotime('now'));
+                iq_logger('order_sync', '[ORDER EDIT SCREEN] The customer for order ID ' . $order_id . ' (Customer ID ' . $iq_user_id . ') does not exist on IQ. Order cannot be synced as a result.', strtotime('now'));
 
                 // send no records message
                 wp_send_json_error('The customer for this order (Customer ID ' . $iq_user_id . ') does not exist on IQ. Orders for non-existent users cannot be synced. Please sync this customer to IQ first using the button provided.');
@@ -149,11 +156,21 @@ function iq_sync_order() {
 
         $error = curl_error($curl);
 
+        
         wp_send_json('Request to IQ failed with the following error: ' . $error . '. Please reload the page and try again.');
-
+        
         wp_die();
-
+        
     endif;
+
+    curl_close($curl);
+
+    // reset $payload
+    $payload     = '';
+    $request_url = '';
+    $curl        = '';
+    $response    = '';
+    $response_js = '';
 
     // setup request url
     $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Submit_Document_Sales_Order';
@@ -203,15 +220,6 @@ function iq_sync_order() {
             "Stock_Code"  => get_post_meta($prod_id, '_sku', true),
             "Comment"     => $prod->get_name(),
             "Quantity"    => (int)$prod->get_quantity(),
-            "Volumetrics" => [
-                "Units"           => 0,
-                "Volume_Length"   => 0,
-                "Volume_Width"    => 0,
-                "Volume_Height"   => 0,
-                "Volume_Quantity" => 1,
-                "Volume_Value"    => 0,
-                "Volume_Rounding" => 0
-            ],
             "Item_Price_Inclusive" => (float)get_post_meta($prod_id, '_regular_price', true),
             "Item_Price_Exclusive" => (float)number_format(get_post_meta($prod_id, '_regular_price', true) / 1.15, 2, '.', ''),
             "Discount_Percentage"  => 0,
@@ -239,15 +247,6 @@ function iq_sync_order() {
         "stock_description" => "",
         "comment"           => "Shipping cost",
         "quantity"          => 1,
-        "volumetrics"       => [
-            "units"           => 0,
-            "volume_length"   => 0,
-            "volume_width"    => 0,
-            "volume_height"   => 0,
-            "volume_quantity" => 0,
-            "volume_value"    => 0,
-            "volume_rounding" => 0
-        ],
         "item_price_inclusive" => (float)number_format($shipping_cost, 2, '.', ''),
         "item_price_exclusive" => (float)number_format($shipping_cost / 1.15, 2, '.', ''),
         "discount_percentage"  => 0,
@@ -297,7 +296,7 @@ function iq_sync_order() {
     $base_order_data[] = [
         "Export_Class" => "Sales_Order",
         "Document"     => [
-            "Document_Number"              => "SAL".$order_id,
+            "Document_Number"              => $order_id,
             "Delivery_Address_Information" => [
                 $deladdy1,
                 $deladdy2,
@@ -392,7 +391,7 @@ function iq_sync_order() {
         $error = curl_error($curl);
         wp_send_json('Connection to IQ failed with the following error: ' . $error);
 
-        iq_logger('single_order_sync_connect_error', 'Connection to IQ failed with the following error (Order ID:' . $order_id . '): ' . $error, strtotime('now'));
+        iq_logger('order_sync', '[ORDER EDIT SCREEN] Connection to IQ failed with the following error (Order ID:' . $order_id . '): ' . $error, strtotime('now'));
 
     // if request successful, write response to file
     else :
@@ -410,42 +409,80 @@ function iq_sync_order() {
             endif;
 
             // find document number 
-            $doc_number = $response['iq_api_success']['iq_api_success_items'][0][0]['data'];
+            // $doc_number = $response['iq_api_success']['iq_api_success_items'][0][0]['data'];
 
             // save document number to order meta
-            update_post_meta($order_id, '_iq_doc_number', $doc_number);
+            update_post_meta($order_id, '_iq_doc_number', $order_id);
 
             // add order note
-            $order->add_order_note('<b>Order successfully synced to IQ. IQ document number:</b><br> ' . $doc_number, 0, false);
+            $order->add_order_note('<b>Order successfully synced to IQ. IQ document number:</b><br> ' . $order_id);
             $order->save();
 
             // log
-            iq_logger('single_order_sync_success', 'Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $doc_number, strtotime('now'));
+            iq_logger('order_sync', '[ORDER EDIT SCREEN] Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $order_id, strtotime('now'));
 
             // return success message
-            wp_send_json('Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $doc_number . '.');
+            wp_send_json('Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $order_id); 
 
         // if IQ error returned
         elseif ($response['iq_api_error'][0]['iq_error_code'] != 0) :
 
             // retrieve, combine and display/log/return error messages
-            $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['errors'];
+            $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['items'];
 
-            $err_msg = '';
+            print_r($response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data']);
 
-            foreach ($error_arr as $err_data) :
-                $err_msg .= $err_data['error_description'];
+            wp_die();
+
+            // base err msg
+            $err_msg = '<b>This order could not be synced to IQ due to the following error(s) returned by IQ during the sync process:</b><br><br>';
+
+            // errors arr
+            $errors = [];
+
+            // loop through err are to retrieve product data and associated errors and push to $errors
+            foreach ($error_arr as $item) :
+                if (!empty($item['errors'])) :
+
+                    $errors[] = [
+                        'stock_code' => isset($item['stock_code']) ? $item['stock_code'] : 'SKU not defined on WooCommerce',
+                        'prod_title' => $item['comment'],
+                        'err_code' => $item['errors'][0]['error_code'],
+                        'err_desc' => $item['errors'][0]['error_description']
+                    ];
+
+                endif;
             endforeach;
 
-            // add order note
-            $order->add_order_note('<b>Order automatic sync to IQ failed with the following error(s):</b><br> ' . $err_msg, 0, false);
+            // loop through $errors and compile error msg
+            foreach ($errors as $err_data) :
+                $err_msg .= '<u><b>SKU:</b></u> ' . $err_data['stock_code'] . '<br>';
+                $err_msg .= '<u><b>Product title:</b></u> ' . $err_data['prod_title'] . '<br>';
+                $err_msg .= '<u><b>IQ error code:</b></u> ' . $err_data['err_code'] . '<br>';
+                $err_msg .= '<u><b>IQ error message:</b></u> ' . $err_data['err_desc'] . '<br>';
+            endforeach;
+
+            $err_msg .= '<b>Please rectify these errors on IQ before attempting to sync again.</b>';
+
+            // print $err_msg;
+
+            // add order note with error msg
+            $order->add_order_note($err_msg);
             $order->save();
 
             // add log
-            iq_logger('single_order_sync_iq_error', 'Single order submission to IQ failed with the follow IQ error(s) for order ' . $order_id . ': ' . $err_msg, strtotime('now'));
+            iq_logger('order_sync', '[ORDER EDIT SCREEN] Single order submission to IQ failed with the following IQ error(s) for order ID ' . $order_id . ':', strtotime('now'));
+
+            // loop through $errors and log each
+            foreach ($errors as $err_data) :
+                iq_logger('order_sync', 'SKU: ' . $err_data['stock_code'], strtotime('now'));
+                iq_logger('order_sync', 'Product title: ' . $err_data['prod_title'], strtotime('now'));
+                iq_logger('order_sync', 'IQ error code: ' . $err_data['err_code'], strtotime('now'));
+                iq_logger('order_sync', 'IQ error message: ' . $err_data['err_desc'], strtotime('now'));
+            endforeach;
 
             // send error
-            wp_send_json_error('Could not sync order ' . $order_id . ' to IQ because of the following error(s): ' . $err_msg);
+            wp_send_json_error('Could not sync order ' . $order_id . ' to IQ because of IQ returned errors during the sync process. Details of these errors will appear under Order Notes in the right sidebar.');
 
         endif;
 

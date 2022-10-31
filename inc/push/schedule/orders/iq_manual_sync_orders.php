@@ -41,11 +41,11 @@ function iq_schedule_manual_sync_orders() {
 add_action('iq_manual_sync_orders', function () {
 
     // add to log run time start
-    iq_logger('order_sync_times', 'Order sync started', strtotime('now'));
+    iq_logger('order_sync', 'Order sync started', strtotime('now'));
 
     // update code gets executed from here
     iq_sync_orders();
 
     // add to log run time end
-    iq_logger('order_sync_times', 'Order sync ended', strtotime('now'));
+    iq_logger('order_sync', 'Order sync ended', strtotime('now'));
 });
