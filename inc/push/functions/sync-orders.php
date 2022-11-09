@@ -54,7 +54,7 @@ function iq_sync_orders() {
     $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Request_GenericSQL';
 
     // setup payload
-    $payload = '';
+
     $payload = [
         'IQ_API' => [
             'IQ_API_Request_GenericSQL' => [
@@ -148,6 +148,8 @@ function iq_sync_orders() {
 
     endif;
 
+    curl_close($curl);
+
     /**
      * If no IQ orders returned, bail with log message
      */
@@ -183,7 +185,7 @@ function iq_sync_orders() {
             $request_url = $settings['host-url'] . ':' . $settings['port-no'] . '/IQRetailRestAPI/' . $settings['api-version'] . '/IQ_API_Request_GenericSQL';
 
             // setup payload
-            $payload = '';
+
             $payload = [
                 'IQ_API' => [
                     'IQ_API_Request_GenericSQL' => [
@@ -196,6 +198,7 @@ function iq_sync_orders() {
                     ]
                 ]
             ];
+            $curl = curl_init();
 
             // init curl options
             curl_setopt_array($curl, array(
@@ -270,6 +273,8 @@ function iq_sync_orders() {
 
                 iq_logger('order_sync', 'Order IQ document number cURL request failed with error: ' . $error, strtotime('now'));
             endif;
+
+            curl_close($curl);
 
         endif;
 
@@ -366,7 +371,7 @@ function iq_sync_orders() {
         iq_logger('order_sync', 'Setting up user/debtor check payload.', strtotime('now'));
 
         // setup request payload
-        $payload = '';
+
         $payload = [
             'IQ_API' => [
                 'IQ_API_Request_GenericSQL' => [
@@ -382,6 +387,8 @@ function iq_sync_orders() {
 
         // check if user is already on iq; if not, offer to sync and bail
         iq_logger('order_sync', 'Init cURL for user/debtor request to IQ.', strtotime('now'));
+
+        $curl = curl_init();
 
         curl_setopt_array($curl, array(
             CURLOPT_URL            => $request_url,
@@ -481,6 +488,8 @@ function iq_sync_orders() {
 
         endif;
 
+        curl_close($curl);
+
         iq_logger('order_sync', 'Setting up cURL order sync request URL.', strtotime('now'));
 
         // setup request url
@@ -489,7 +498,7 @@ function iq_sync_orders() {
         iq_logger('order_sync', 'Setting cURL up request payload.', strtotime('now'));
 
         // setup initial payload
-        $payload = '';
+
         $payload = [
             'IQ_API' => [
                 'IQ_API_Submit_Document_Sales_Order' => [
@@ -688,7 +697,7 @@ function iq_sync_orders() {
         iq_logger('order_sync', 'Pushing data to request payload.', strtotime('now'));
 
         // push $base_order_data to Processing_Documents key in $payload
-        $payload['IQ_API']['IQ_API_Submit_Document_Sales_Order']['IQ_Submit_Data']['IQ_Root_JSON']['Processing_Documents'] = $base_order_data;
+        $payload['IQ_API']['IQ_API_Submit_Document_Sales_Order']['IQ_Submit_Data']['IQ_Root_JSON']['Processing_Documents'][] = $base_order_data;
 
         // file_put_contents(IQ_RETAIL_PATH . 'logs-files/payload_' . $order_id . '.txt', print_r($payload, true), FILE_APPEND); 
 
@@ -699,6 +708,8 @@ function iq_sync_orders() {
          */
 
         iq_logger('order_sync', 'Init order sync cURL request to IQ.', strtotime('now'));
+
+        $curl = curl_init();
 
         curl_setopt_array($curl, array(
             CURLOPT_URL            => $request_url,
@@ -751,14 +762,14 @@ function iq_sync_orders() {
                 if ($doc_number !== '') :
 
                     // save document number to order meta
-                    update_post_meta($order_id, '_iq_doc_number', $order_id);
+                    update_post_meta($order_id, '_iq_doc_number', $doc_number);
 
                     // add order note
                     $order->add_order_note('<b>Order successfully synced to IQ.<br> IQ document number:</b><br> ' . $doc_number);
                     $order->save();
 
                     // log
-                    iq_logger('order_sync', 'Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $order_id, strtotime('now'));
+                    iq_logger('order_sync', 'Order ID ' . $order_id . ' successfully synced to IQ. IQ document number: ' . $doc_number, strtotime('now'));
 
                 else :
 
@@ -777,62 +788,119 @@ function iq_sync_orders() {
             // if IQ error returned
             elseif ($response['iq_api_error'][0]['iq_error_code'] != 0) :
 
-                // retrieve, combine and display/log/return error messages
-                $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['items'];
+                if (!isset($response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data'])) :
 
-                // base err msg
-                $err_msg = '<b><u>AUTO IQ SYNC FAILURE</u></b><br>';
-                $err_msg = '<b>This order could not be synced to IQ due to the following error(s) returned by IQ during the sync process:</b><br>';
+                    // base err msg
+                    $err_msg = '<b><u>AUTO IQ SYNC FAILURE</u></b><br>';
+                    $err_msg = '<b>This order could not be synced to IQ due to the following error(s) returned by IQ during the sync process:</b><br>';
 
-                // errors arr
-                $errors = [];
+                    // retrieve error data
+                    $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'];
 
-                // loop through err are to retrieve product data and associated errors and push to $errors
-                foreach ($error_arr as $item) :
-                    if (!empty($item['errors'])) :
+                    // errors arr
+                    $errors = [];
+
+                    // loop through err are to retrieve product data and associated errors and push to $errors
+                    foreach ($error_arr as $err_data) :
 
                         $errors[] = [
-                            'stock_code' => isset($item['stock_code']) ? $item['stock_code'] : 'SKU not defined on WooCommerce',
-                            'prod_title' => $item['comment'],
-                            'err_code' => $item['errors'][0]['error_code'],
-                            'err_desc' => $item['errors'][0]['error_description']
+                            'err_code' => $err_data['iq_error_code'],
+                            'err_desc' => $err_data['iq_error_description']
                         ];
 
-                    endif;
-                endforeach;
+                    endforeach;
 
-                // loop through $errors and compile error msg
-                foreach ($errors as $err_data) :
-                    $err_msg .= '<u><b>SKU:</b></u> ' . $err_data['stock_code'] . '<br>';
-                    $err_msg .= '<u><b>Product title:</b></u> ' . $err_data['prod_title'] . '<br>';
-                    $err_msg .= '<u><b>IQ error code:</b></u> ' . $err_data['err_code'] . '<br>';
-                    $err_msg .= '<u><b>IQ error message:</b></u> ' . $err_data['err_desc'] . '<br>';
-                endforeach;
+                    // loop through $errors and compile error msg
+                    foreach ($errors as $err_data) :
+                        $err_msg .= '<u><b>IQ error code:</b></u> ' . $err_data['err_code'] . '<br>';
+                        $err_msg .= '<u><b>IQ error message:</b></u> ' . $err_data['err_desc'] . '<br>';
+                    endforeach;
 
-                $err_msg .= '<b>Please rectify these errors on IQ before attempting to sync again.</b>';
+                    $err_msg .= '<b>The cause of this error is unknown. Please contact IQ for support.</b>';
 
-                // print $err_msg;
+                    // add order note with error msg
+                    $order->add_order_note($err_msg);
+                    $order->save();
 
-                // add order note with error msg
-                $order->add_order_note($err_msg);
-                $order->save();
+                    // add log
+                    iq_logger('order_sync', 'Order submission to IQ failed with the following IQ error(s):', strtotime('now'));
 
-                // add log
-                iq_logger('order_sync', 'Order submission to IQ failed with the following IQ error(s):', strtotime('now'));
+                    // loop through $errors and log each
+                    foreach ($errors as $err_data) :
+                        iq_logger('order_sync', 'IQ error code: ' . $err_data['err_code'], strtotime('now'));
+                        iq_logger('order_sync', 'IQ error message: ' . $err_data['err_desc'], strtotime('now'));
+                    endforeach;
 
-                // loop through $errors and log each
-                foreach ($errors as $err_data) :
-                    iq_logger('order_sync', 'SKU: ' . $err_data['stock_code'], strtotime('now'));
-                    iq_logger('order_sync', 'Product title: ' . $err_data['prod_title'], strtotime('now'));
-                    iq_logger('order_sync', 'IQ error code: ' . $err_data['err_code'], strtotime('now'));
-                    iq_logger('order_sync', 'IQ error message: ' . $err_data['err_desc'], strtotime('now'));
-                endforeach;
+                    iq_logger('order_sync', 'Moving on to next order.', strtotime('now'));
+                    iq_logger('order_sync', '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', strtotime('now'));
 
-                iq_logger('order_sync', 'Moving on to next order.', strtotime('now'));
-                iq_logger('order_sync', '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', strtotime('now'));
+                elseif (isset($response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['items'])) :
 
-                continue;
+                    // retrieve, combine and display/log/return error messages
+                    $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['items'];
 
+                    // file_put_contents(IQ_RETAIL_PATH . 'logs-files/order_sync_err_' . $order_id . '.txt', print_r($response, true));
+                    // continue;
+
+                    // base err msg
+                    $err_msg = '<b><u>AUTO IQ SYNC FAILURE</u></b><br>';
+                    $err_msg = '<b>This order could not be synced to IQ due to the following error(s) returned by IQ during the sync process:</b><br>';
+
+                    // errors arr
+                    $errors = [];
+
+                    // loop through err are to retrieve product data and associated errors and push to $errors
+                    foreach ($error_arr as $item) :
+                        if (!empty($item['errors'])) :
+
+                            $errors[] = [
+                                'stock_code' => isset($item['stock_code']) ? $item['stock_code'] : 'SKU not defined on WooCommerce',
+                                'prod_title' => $item['comment'],
+                                'err_code' => $item['errors'][0]['error_code'],
+                                'err_desc' => $item['errors'][0]['error_description']
+                            ];
+
+                        endif;
+                    endforeach;
+
+                    // loop through $errors and compile error msg
+                    foreach ($errors as $err_data) :
+                        $err_msg .= '<u><b>SKU:</b></u> ' . $err_data['stock_code'] . '<br>';
+                        $err_msg .= '<u><b>Product title:</b></u> ' . $err_data['prod_title'] . '<br>';
+                        $err_msg .= '<u><b>IQ error code:</b></u> ' . $err_data['err_code'] . '<br>';
+                        $err_msg .= '<u><b>IQ error message:</b></u> ' . $err_data['err_desc'] . '<br>';
+                    endforeach;
+
+                    $err_msg .= '<b>Please rectify these errors on IQ before attempting to sync again.</b>';
+
+                    // print $err_msg;
+
+                    // add order note with error msg
+                    $order->add_order_note($err_msg);
+                    $order->save();
+
+                    // add log
+                    iq_logger('order_sync', 'Order submission to IQ failed with the following IQ error(s):', strtotime('now'));
+
+                    // loop through $errors and log each
+                    foreach ($errors as $err_data) :
+                        iq_logger('order_sync', 'SKU: ' . $err_data['stock_code'], strtotime('now'));
+                        iq_logger('order_sync', 'Product title: ' . $err_data['prod_title'], strtotime('now'));
+                        iq_logger('order_sync', 'IQ error code: ' . $err_data['err_code'], strtotime('now'));
+                        iq_logger('order_sync', 'IQ error message: ' . $err_data['err_desc'], strtotime('now'));
+                    endforeach;
+
+                    iq_logger('order_sync', 'Moving on to next order.', strtotime('now'));
+                    iq_logger('order_sync', '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', strtotime('now'));
+
+                    continue;
+
+                else :
+
+                    iq_logger('order_sync', 'Unable to retrieve error data. Full response written to file for investigation.', strtotime('now'));
+                    iq_filer('order_err_response_' . $order_id, $response_json);
+
+                endif;
             endif;
 
         // if request successful, write response to file and order notes
@@ -847,12 +915,13 @@ function iq_sync_orders() {
 
         endif;
 
+        curl_close($curl);
+
         iq_logger('order_sync', 'Ending single order loop for order ID ' . $order_id, strtotime('now'));
         iq_logger('order_sync', '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', strtotime('now'));
 
     endforeach;
 
-    curl_close($curl);
 
     // reset time limit once done
     set_time_limit(120);
