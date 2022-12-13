@@ -80,11 +80,13 @@ function iq_check_order_status() {
             // if records
             elseif (!empty($records)) :
 
-                iq_logger('order_sync', 'Order ID ' . $order_id . ' already present on IQ. Skipping...', strtotime('now'));
+                iq_logger('order_sync', 'Order ID ' . $order_id . ' already present on IQ.', strtotime('now'));
 
                 update_post_meta($order_id, '_iq_doc_number', $records['document']);
+
+                // print_r($records);
                 
-                wp_send_json('This order is already present on IQ. IQ document number ' . $records['document'] . ' has been added to order meta.');
+                wp_send_json('This order is already present on IQ. IQ document number ' . $records . ' has been added to order meta.');
 
             endif;
 

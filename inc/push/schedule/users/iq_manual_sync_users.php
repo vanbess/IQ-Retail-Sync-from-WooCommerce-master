@@ -20,7 +20,7 @@ function iq_schedule_manual_sync_users() {
     if (false === as_has_scheduled_action('iq_manual_sync_users') && function_exists('as_has_scheduled_action')) :
 
         // schedule action
-        $scheduled_id = as_schedule_single_action(strtotime('now'), 'iq_manual_sync_users', [], 'iq_api_sync');
+        $scheduled_id = as_schedule_single_action(strtotime('now'), 'iq_manual_sync_users', [], 'iq_api_manual_sync');
 
     endif;
 

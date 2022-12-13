@@ -21,7 +21,7 @@ function iq_schedule_manual_sync_orders() {
     if (false === as_has_scheduled_action('iq_manual_sync_orders') && function_exists('as_has_scheduled_action')) :
 
         // schedule action
-        $action_id = as_schedule_single_action(strtotime('now'), 'iq_manual_sync_orders', [], 'iq_api_sync');
+        $action_id = as_schedule_single_action(strtotime('now'), 'iq_manual_sync_orders', [], 'iq_api_manual_sync');
 
     endif;
 
@@ -41,11 +41,11 @@ function iq_schedule_manual_sync_orders() {
 add_action('iq_manual_sync_orders', function () {
 
     // add to log run time start
-    iq_logger('order_sync', 'Order sync started', strtotime('now'));
+    iq_logger('order_sync_times', 'Order sync started', strtotime('now'));
 
     // update code gets executed from here
     iq_sync_orders();
 
     // add to log run time end
-    iq_logger('order_sync', 'Order sync ended', strtotime('now'));
+    iq_logger('order_sync_times', 'Order sync ended', strtotime('now'));
 });

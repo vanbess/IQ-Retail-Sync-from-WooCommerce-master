@@ -6,13 +6,10 @@
 
 // setup SQL query string
 if ($last_fetch_date != '') :
-    $sql_string = "select code, descript, sellpinc1, memo, modified, onhand from Stock where webitem = true and modified > '$last_fetch_date' order by code;";
+    $sql_string = "select code, descript, sellpinc1, memo, modified, onhand, salesorder from Stock where webitem = true and modified > '$last_fetch_date' order by code;";
 else :
-    $sql_string = "select code, descript, sellpinc1, memo, modified, onhand from Stock where webitem = true order by code;";
+    $sql_string = "select code, descript, sellpinc1, memo, modified, onhand, salesorder from Stock where webitem = true order by code;";
 endif;
-
-// set max execution time
-ini_set('max_execution_time', 300);
 
 // retrieve IQ settings
 $settings = maybe_unserialize(get_option('iq_settings'));

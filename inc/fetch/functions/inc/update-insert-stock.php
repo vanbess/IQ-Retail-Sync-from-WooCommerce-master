@@ -17,10 +17,14 @@ endif;
 // loop
 if (is_array($products) || is_object($products)) :
 
+    // up mem limit to temp disable any memory allocation errors
+    $memlimit = ini_get('memory_limit');
+    ini_set('memory_limit', -1);
+
     foreach ($products as $product) :
 
         // reset execution timer on each iteration so that we don't run into timeout issues
-        set_time_limit(60);
+        set_time_limit(0);
 
         // retrieve product ID by sku
         $wc_prod_id = wc_get_product_id_by_sku($product['code']);
@@ -31,11 +35,16 @@ if (is_array($products) || is_object($products)) :
             // retrieve product
             $wc_prod = wc_get_product($wc_prod_id);
 
+            // calculate actual stock on hand
+            $onhand   = (int)$product['onhand'];
+            $sales    = (int)$product['salesorder'];
+            $in_stock = $onhand - $sales;
+
             // update
-            $wc_prod->set_name($product['descript']);
+            $wc_prod->set_name($product['descript'] . ' ' . $product['code']);
             $wc_prod->set_regular_price($product['sellpinc1']);
             $wc_prod->set_short_description(trim($product['memo']));
-            $wc_prod->set_stock_quantity($product['onhand']);
+            $wc_prod->set_stock_quantity($in_stock);
             $wc_prod->set_weight($product['weight']);
             $wc_prod->set_manage_stock(true);
             $wc_prod->set_backorders('yes');
@@ -58,12 +67,17 @@ if (is_array($products) || is_object($products)) :
 
             $wc_prod = new WC_Product();
 
+            // calculate actual stock on hand
+            $onhand   = (int)$product['onhand'];
+            $sales    = (int)$product['salesorder'];
+            $in_stock = $onhand - $sales;
+
             // set details
             $wc_prod->set_sku($product['code']);
-            $wc_prod->set_name($product['descript']);
+            $wc_prod->set_name($product['descript'] . ' ' . $product['code']);
             $wc_prod->set_regular_price($product['sellpinc1']);
             $wc_prod->set_short_description(trim($product['memo']));
-            $wc_prod->set_stock_quantity($product['onhand']);
+            $wc_prod->set_stock_quantity($in_stock);
             $wc_prod->set_weight($product['weight']);
             $wc_prod->set_manage_stock(true);
             $wc_prod->set_backorders('yes');
@@ -85,7 +99,7 @@ if (is_array($products) || is_object($products)) :
 
     endforeach;
 
-endif;
+    // reset memory limit post run
+    ini_set('memory_limit', $memlimit);
 
-// reset max execution time
-ini_set('max_execution_time', 120);
+endif;

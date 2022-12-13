@@ -1,5 +1,7 @@
 <?php
 
+use Symfony\Component\CssSelector\XPath\Translator;
+
 /**
  * Function to manually push new users to IQ
  */
@@ -85,15 +87,17 @@ function iq_sync_users() {
             // loop to extract ext users and push to $ext_users
             $iq_users = $response['iq_api_result_data']['records'];
 
-            foreach ($iq_users as $user_data) :
-
-                // format user acc number to match WP user ID format
-                $user_id = str_replace('WWW', '', $user_data['account']);
-
-                // push
-                $ext_users[] = $user_id;
-
-            endforeach;
+            // if(is_array($iq_users) && is_iterable($iq_users)):
+                foreach ($iq_users as $user_data) :
+                    
+                    // format user acc number to match WP user ID format
+                    $user_id = str_replace('WWW', '', $user_data['account']);
+                    
+                    // push
+                    $ext_users[] = $user_id;
+                    
+                endforeach;
+            // endif;
 
         endif;
 
@@ -117,7 +121,8 @@ function iq_sync_users() {
     // write $ext_users to file for later ref
     iq_filer('users_ext', json_encode($ext_users));
 
-    file_put_contents(IQ_RETAIL_PATH . 'logs-files/users_ext.txt', print_r($ext_users, true), FILE_APPEND);
+    // debug
+    // file_put_contents(IQ_RETAIL_PATH . 'logs-files/users_ext.txt', print_r($ext_users, true), FILE_APPEND);
 
     // loop through customers and send sync request for each
     if (is_object($wc_customers) || is_array($wc_customers) && !empty($wc_customers)) :
@@ -125,7 +130,7 @@ function iq_sync_users() {
         foreach ($wc_customers as $customer) :
 
             // set time limit for each iteration of the loop, just in case
-            set_time_limit(30);
+            set_time_limit(0);
 
             // if customer id in $ext_users, continue
             if (in_array($customer->ID, $ext_users)) :
@@ -186,6 +191,12 @@ function iq_sync_users() {
                 $b_tel      = $last_order->get_billing_phone();
                 $b_country  = $last_order->get_billing_country();
                 $b_email    = $last_order->get_billing_email();
+                $b_company  = $last_order->get_billing_company();
+
+                // get billing & shipping suburb
+                $order_id = $last_order->get_order_number();
+                $b_suburb = get_post_meta($order_id, '_billing_suburb', true) ? get_post_meta($order_id, '_billing_suburb', true) : 'No suburb provided';
+                $s_suburb = get_post_meta($order_id, '_shipping_suburb', true) ? get_post_meta($order_id, '_shipping_suburb', true) : 'No suburb provided';
 
                 // retrieve shipping address details
                 $s_address1 = $last_order->get_shipping_address_1();
@@ -214,6 +225,12 @@ function iq_sync_users() {
                 $b_tel      = $customer->get_billing_phone();
                 $b_country  = $customer->get_billing_country();
                 $b_email    = $customer->get_billing_email();
+                $b_company  = $customer->get_billing_company();
+
+                // / get billing & shipping suburb
+                $customer_id = $customer->ID;
+                $b_suburb    = get_user_meta($customer_id, 'billing_suburb', true) ? get_user_meta($customer_id, 'billing_suburb', true) : 'No suburb provided';
+                $s_suburb    = get_user_meta($customer_id, 'shipping_suburb', true) ? get_user_meta($customer_id, 'shipping_suburb', true) : 'No suburb provided';
 
                 // retrieve shipping address details
                 $s_address1 = $customer->get_shipping_address_1();
@@ -239,26 +256,31 @@ function iq_sync_users() {
                     $b_address1,
                     $b_address2,
                     WC()->countries->get_states($b_country)[$b_state],
+                    $b_suburb,
                     $b_city,
+                    $b_country,
                     $b_postcode
                 ],
                 "delivery_address_details" => [
                     $s_address1,
                     $s_address2,
                     WC()->countries->get_states($s_country)[$s_state],
+                    $s_suburb,
                     $s_city,
+                    $s_country,
                     $s_postcode
                 ],
-                "credit_limit"               => 0,
+                "credit_limit"               => 1,
                 "telephone_numbers"          => [
                     $b_tel
                 ],
                 "cellphone_number"           => $s_tel,
+                "tradingas"                  => strlen($b_company) !== 0 ? $b_company : 'Not applicable',
                 "email_address"              => $b_email,
                 "allow_use_of_email_address" => true,
                 "debtor_account"             => $iq_user_id,
                 "debtor_name"                => $name,
-                "debtor_group"               => "D505",
+                "debtor_group"               => "D050",
                 "invoice_layout"             => 1,
                 "delivery_route"             => "R001",
                 "normal_representative"      => 1,
@@ -354,5 +376,5 @@ function iq_sync_users() {
     endif;
 
     // reset time limit
-    set_time_limit(120);
+    // set_time_limit(120);
 }

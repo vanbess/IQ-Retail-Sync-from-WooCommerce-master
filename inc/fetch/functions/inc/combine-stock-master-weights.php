@@ -21,6 +21,8 @@ $combined = [];
 // loop
 foreach ($fetched_stock as $prod_data) :
 
+    set_time_limit(0);
+
     // add weight key to $prod_data
     $prod_data['weight'] = '';
 

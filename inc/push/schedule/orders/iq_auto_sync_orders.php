@@ -22,10 +22,13 @@ if ($iq_settings['enable-order-sync'] != 'yes') :
 endif;
 
 // if $time_now > $last_run + $sync_run_interval, and run not scheduled, schedule run
-if ($last_run && false === as_has_scheduled_action('iq_auto_sync_orders') && function_exists('as_has_scheduled_action')) :
+// if ($last_run && false === as_has_scheduled_action('iq_auto_sync_orders') && function_exists('as_has_scheduled_action')) :
+if (false === as_has_scheduled_action('iq_auto_sync_orders') && function_exists('as_has_scheduled_action')) :
+
+    as_schedule_recurring_action(strtotime('now'), $sync_run_interval, 'iq_auto_sync_orders', [], 'iq_api_auto_sync');
 
     // schedule action
-    as_schedule_single_action($last_run + $sync_run_interval, 'iq_auto_sync_orders', [], 'iq_api_sync');
+    // as_schedule_single_action($last_run + $sync_run_interval, 'iq_auto_sync_orders', [], 'iq_api_sync');
 
 endif;
 
@@ -35,7 +38,7 @@ endif;
 add_action('iq_auto_sync_orders', function () {
 
     // add to log run time start
-    iq_logger('order_sync', 'Order sync started', strtotime('now'));
+    iq_logger('order_sync_times', 'Order sync started', strtotime('now'));
 
     // sync orders
     iq_sync_orders();

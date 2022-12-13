@@ -6,7 +6,7 @@
  * Version:           1.0.0
  * Requires at least: 5.2
  * Requires PHP:      7.2
- * Author:            WC Bessinger @ Engage24.com
+ * Author:            Caxton Books
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       iq-retail-api
@@ -58,6 +58,11 @@ add_action('init', function () {
      */
     function iq_logger($file_name, $message, $time_stamp, $debug = false) {
 
+        // delete old files to avoid creating massive logs
+        if (file_exists(__DIR__ . '/logs-files/' . $file_name . '.log')) :
+            unlink(__DIR__ . '/logs-files/' . $file_name . '.log');
+        endif;
+
         // setup date and time
         $date_time = date('j F Y @ h:i:s', $time_stamp);
 
@@ -82,6 +87,11 @@ add_action('init', function () {
      * @return void
      */
     function iq_filer($file_name, $json_data, $debug = false) {
+
+        // if file exists, delete it first
+        if (file_exists(__DIR__ . '/logs-files/' . $file_name . '.json')) :
+            unlink(__DIR__ . '/logs-files/' . $file_name . '.json');
+        endif;
 
         // write to file
         file_put_contents(__DIR__ . '/logs-files/' . $file_name . '.json', $json_data);
