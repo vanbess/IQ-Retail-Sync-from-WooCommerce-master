@@ -1,2 +1,16 @@
 .vscode/settings.json
 .vscode/sftp.json
+inc/fetch/files/stock-combined.json
+inc/fetch/files/stock-master.json
+inc/fetch/files/stock-weight.json
+inc/fetch/logs/manual-sync/products-inserted.log
+inc/fetch/logs/manual-sync/products-updated.log
+inc/fetch/logs/manual-sync/stock_weight_fetch.log
+inc/fetch/logs/manual-sync/stock-fetch.log
+inc/fetch/logs/manual-sync/sync.log
+logs-files/order_sync_times.log
+logs-files/order_sync.log
+logs-files/user_sync_times.log
+logs-files/user_sync.log
+logs-files/users_ext.json
+logs-files/users_ext.txt
