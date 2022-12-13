@@ -14,3 +14,8 @@ logs-files/user_sync_times.log
 logs-files/user_sync.log
 logs-files/users_ext.json
 logs-files/users_ext.txt
+logs-files/single_user_sync_request_fail.log
+logs-files/user_sync_times.log
+logs-files/user_sync.log
+logs-files/user_sync_times.log
+logs-files/user_sync.log

@@ -58,8 +58,7 @@ add_action('init', function () {
      */
     function iq_logger($file_name, $message, $time_stamp, $debug = false) {
 
-        // delete old files to avoid creating massive logs
-        if (file_exists(__DIR__ . '/logs-files/' . $file_name . '.log')) :
+        if(filesize(__DIR__ . '/logs-files/' . $file_name . '.log') > 52428800):
             unlink(__DIR__ . '/logs-files/' . $file_name . '.log');
         endif;
 
@@ -88,8 +87,7 @@ add_action('init', function () {
      */
     function iq_filer($file_name, $json_data, $debug = false) {
 
-        // if file exists, delete it first
-        if (file_exists(__DIR__ . '/logs-files/' . $file_name . '.json')) :
+        if(filesize(__DIR__ . '/logs-files/' . $file_name . '.json') > 52428800):
             unlink(__DIR__ . '/logs-files/' . $file_name . '.json');
         endif;
 

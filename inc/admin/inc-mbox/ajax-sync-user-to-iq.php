@@ -18,10 +18,10 @@ function iq_sync_single_user() {
     $iq_user_id = 'WWW' . $user_id;
 
     // if user has IQ user id meta, bail with message
-    if (get_user_meta($user_id, '_iq_user_id', true)) :
-        wp_send_json('This customer is already present on the IQ database, so this order can be safely synced to IQ if not synced already.');
-        wp_die();
-    endif;
+    // if (get_user_meta($user_id, '_iq_user_id', true)) :
+    //     wp_send_json('This customer is already present on the IQ database, so this order can be safely synced to IQ if not synced already.');
+    //     wp_die();
+    // endif;
 
     // retrieve iq settings
     $settings = maybe_unserialize(get_option('iq_settings'));
