@@ -35,9 +35,8 @@ function iq_schedule_manual_sync_orders() {
 }
 
 /**
- * Function to run to do minor syn
+ * Function to run to do minor sync
  */
-// Function to run to do minor sync
 add_action('iq_manual_sync_orders', function () {
 
     // add to log run time start

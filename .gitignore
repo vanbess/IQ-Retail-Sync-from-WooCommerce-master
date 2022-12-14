@@ -15,14 +15,8 @@ logs-files/user_sync.log
 logs-files/users_ext.json
 logs-files/users_ext.txt
 logs-files/single_user_sync_request_fail.log
-logs-files/user_sync_times.log
-logs-files/user_sync.log
-logs-files/user_sync_times.log
-logs-files/user_sync.log
 logs-files/single_user_sync_success.log
-logs-files/user_sync.log
 logs-files/order_product_issues.log
 logs-files/order_sync_manual.log
 logs-files/single_user_sync_iq_error.log
 logs-files/user_check_order_sync.json
-logs-files/user_sync.log
