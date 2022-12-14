@@ -111,7 +111,7 @@ function iq_sync_single_order() {
 
                 $.post(ajaxurl, data, function(response) {
 
-                    // console.log(response);
+                    console.log(response);
 
                     // return;
 
@@ -148,7 +148,6 @@ function iq_sync_single_order() {
                         alert(response.data);
                     } else {
                         alert(response);
-                        location.reload();
                     }
 
                     $('#iq-sync-user').text('Sync Customer to IQ');

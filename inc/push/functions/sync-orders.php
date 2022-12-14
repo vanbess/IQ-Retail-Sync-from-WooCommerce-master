@@ -14,6 +14,8 @@ function iq_sync_orders() {
     $basic_auth     = base64_encode($basic_auth_raw);
     $auth_string    = 'Basic ' . $basic_auth;
 
+    iq_logger('order_sync', '###########################################################################################################', strtotime('now'));
+    iq_logger('order_sync', 'Bulk order sync process START.', strtotime('now'));
     iq_logger('order_sync', 'Retrieving unsynced orders with status PROCESSING and _iq_doc_number empty.', strtotime('now'));
 
     // retrieve all orders for which meta key _iq_doc_number doesn't exist
@@ -382,10 +384,12 @@ function iq_sync_orders() {
                     'IQ_User_Number'        => $settings['user-no'],
                     'IQ_User_Password'      => $settings['user-pass-api-key'],
                     'IQ_Partner_Passphrase' => !empty($settings['passphrase']) ? $settings['passphrase'] : '',
-                    "IQ_SQL_Text"           => "SELECT * FROM debtors WHERE account = '$iq_user_id';"
+                    "IQ_SQL_Text"           => "SELECT account FROM debtors WHERE account LIKE '%$iq_user_id%';"
                 ]
             ]
         ];
+
+        iq_filer('user_check_order_sync', json_encode($payload));
 
         // check if user is already on iq; if not, offer to sync and bail
         iq_logger('order_sync', 'Init cURL for user/debtor request to IQ.', strtotime('now'));
@@ -411,6 +415,8 @@ function iq_sync_orders() {
         iq_logger('order_sync', 'Sending existing user/debtor request to IQ.', strtotime('now'));
 
         $response_json = curl_exec($curl);
+
+        file_put_contents(IQ_RETAIL_PATH . 'order_user_request_response.txt', print_r($response_json, true), FILE_APPEND);
 
         // request successful
         if (false !== $response_json) :
@@ -626,18 +632,18 @@ function iq_sync_orders() {
         if (get_post_meta($order_id, 'bookpack_id', true)) :
 
             iq_logger('order_sync', 'Bookpack and associated student meta found in order. Generating bookpack meta long description...', strtotime('now'));
-            
+
             // get bookpack id
             $bookpack_id = get_post_meta($order_id, 'bookpack_id', true);
-            
+
             // build bookpack long description
             $long_descr .= 'Bookpack: ' . get_the_title($bookpack_id) . PHP_EOL;
             $long_descr .= 'Pupil Name: ' . get_post_meta($order_id, 'pupil_name', true) . PHP_EOL;
             $long_descr .= 'Pupil School: ' . get_post_meta($order_id, 'pupil_school', true) . PHP_EOL;
             $long_descr .= 'Pupil Grade: ' . get_post_meta($order_id, 'pupil_grade', true) . PHP_EOL;
-            
+
             iq_logger('order_sync', 'Bookpack meta long description generated.', strtotime('now'));
-            
+
         endif;
 
         iq_logger('order_sync', 'Setting up base order data array and pushing line items to said array.', strtotime('now'));
@@ -869,7 +875,6 @@ function iq_sync_orders() {
                     // loop through err are to retrieve product data and associated errors and push to $errors
                     foreach ($error_arr as $item) :
                         if (!empty($item['errors'])) :
-
                             $errors[] = [
                                 'stock_code' => isset($item['stock_code']) ? $item['stock_code'] : 'SKU not defined on WooCommerce',
                                 'prod_title' => $item['comment'],
@@ -882,10 +887,23 @@ function iq_sync_orders() {
 
                     // loop through $errors and compile error msg
                     foreach ($errors as $err_data) :
-                        $err_msg .= '<u><b>SKU:</b></u> ' . $err_data['stock_code'] . '<br>';
-                        $err_msg .= '<u><b>Product title:</b></u> ' . $err_data['prod_title'] . '<br>';
-                        $err_msg .= '<u><b>IQ error code:</b></u> ' . $err_data['err_code'] . '<br>';
-                        $err_msg .= '<u><b>IQ error message:</b></u> ' . $err_data['err_desc'] . '<br>';
+
+                        $stock_code = $err_data['stock_code'];
+                        $prod_title = $err_data['prod_title'];
+                        $err_code   = $err_data['err_code'];
+                        $err_desc   = $err_data['err_desc'];
+
+                        // log product issues to separate file
+                        iq_logger('order_product_issues', 'SKU: ' . $stock_code, strtotime('now'));
+                        iq_logger('order_product_issues', 'Product title: ' . $prod_title, strtotime('now'));
+                        iq_logger('order_product_issues', 'IQ error code: ' . $err_code, strtotime('now'));
+                        iq_logger('order_product_issues', 'IQ error message: ' . $err_desc, strtotime('now'));
+
+                        $err_msg .= '<u><b>SKU:</b></u> ' . $stock_code . '<br>';
+                        $err_msg .= '<u><b>Product title:</b></u> ' . $prod_title . '<br>';
+                        $err_msg .= '<u><b>IQ error code:</b></u> ' . $err_code . '<br>';
+                        $err_msg .= '<u><b>IQ error message:</b></u> ' . $err_desc . '<br>';
+
                     endforeach;
 
                     $err_msg .= '<b>Please rectify these errors on IQ before attempting to sync again.</b>';
@@ -938,4 +956,7 @@ function iq_sync_orders() {
         iq_logger('order_sync', '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', strtotime('now'));
 
     endforeach;
+
+    iq_logger('order_sync', 'Bulk order sync process END.', strtotime('now'));
+    iq_logger('order_sync', '###########################################################################################################', strtotime('now'));
 }

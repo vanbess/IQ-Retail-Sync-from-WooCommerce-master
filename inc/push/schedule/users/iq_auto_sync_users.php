@@ -11,6 +11,9 @@ $last_run = get_option('iq_last_auto_sync_users') ? get_option('iq_last_auto_syn
 $iq_settings       = maybe_unserialize(get_option('iq_settings'));
 $sync_run_interval = $iq_settings['minor-sync-interval'];
 
+// temp interval override to catch up
+$sync_run_interval = 1800;
+
 // if $sync_run_interval empty, bail
 if ($sync_run_interval == '') :
     return;

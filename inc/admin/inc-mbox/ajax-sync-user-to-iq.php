@@ -66,6 +66,11 @@ function iq_sync_single_user() {
     $b_city     = $order->get_billing_city();
     $b_postcode = $order->get_billing_postcode();
     $b_tel      = $order->get_billing_phone();
+    $b_country  = $order->get_billing_country();
+    $b_company  = $order->get_billing_country();
+
+    $b_suburb = get_post_meta($order_id, '_billing_suburb', true) ? get_post_meta($order_id, '_billing_suburb', true) : 'No suburb provided';
+    $s_suburb = get_post_meta($order_id, '_shipping_suburb', true) ? get_post_meta($order_id, '_shipping_suburb', true) : 'No suburb provided';
 
     // retrieve shipping address details
     $s_address1 = $order->get_shipping_address_1();
@@ -74,6 +79,7 @@ function iq_sync_single_user() {
     $s_city     = $order->get_shipping_city();
     $s_postcode = $order->get_shipping_postcode();
     $s_tel      = $order->get_shipping_phone();
+    $s_country  = $order->get_shipping_country();
 
     // name
     $name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
@@ -88,14 +94,14 @@ function iq_sync_single_user() {
             $b_address1,
             $b_address2,
             WC()->countries->get_states($order->get_billing_country())[$b_state],
-            $b_city,
+            $b_suburb . ', ' . $b_city . ', ' . $b_country,
             $b_postcode
         ],
         "delivery_address_details" => [
             $s_address1,
             $s_address2,
             WC()->countries->get_states($order->get_shipping_country())[$s_state],
-            $s_city,
+            $s_suburb . ', ' . $s_city . ', ' . $s_country,
             $s_postcode
         ],
         "credit_limit"               => 0,
@@ -103,6 +109,7 @@ function iq_sync_single_user() {
             $b_tel
         ],
         "cellphone_number"           => $s_tel,
+        "tradingas"                  => strlen($b_company) !== 0 ? $b_company : 'Not applicable',
         "email_address"              => $order->get_billing_email(),
         "allow_use_of_email_address" => true,
         "debtor_account"             => $iq_user_id,
@@ -167,10 +174,16 @@ function iq_sync_single_user() {
         // if unable to sync user
         elseif ($response['iq_api_error'][0]['iq_error_code'] !== 0) :
 
+            // file_put_contents(IQ_RETAIL_PATH . 'user_manual_sync_error.txt', print_r($response, true), FILE_APPEND);
+
             // retrieve, combine and display/log/return error messages
             $error_arr = $response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['errors'];
 
             $err_msg = '';
+
+            if (isset($response['response_message'])) :
+                $err_msg .= $response['response_message'];
+            endif;
 
             foreach ($error_arr as $err_data) :
                 $err_msg .= $err_data['error_description'];
