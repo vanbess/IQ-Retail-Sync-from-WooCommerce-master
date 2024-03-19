@@ -538,7 +538,13 @@ function iq_sync_orders() {
 
         iq_logger('order_sync', 'Building order product data array.', strtotime('now'));
 
+        // calculate pre discount cart total
+        $cart_total_no_disc = '';
+
         foreach ($prods as $prod) :
+
+            // calculate cart total
+            $cart_total_no_disc += (float)$prod->get_subtotal();
 
             $prod_id = (int)$prod->get_product_id();
 
@@ -548,10 +554,10 @@ function iq_sync_orders() {
                 "Comment"              => $prod->get_name(),
                 "Quantity"             => (int)$prod->get_quantity(),
                 "Item_Price_Inclusive" => (float)get_post_meta($prod_id, '_regular_price', true),
-                "Item_Price_Exclusive" => (float)get_post_meta($prod_id, '_regular_price', true),
+                "Item_Price_Exclusive" => (float)number_format(get_post_meta($prod_id, '_regular_price', true) / 1.15, 2, '.', ''),
                 "Discount_Percentage"  => 0,
                 "Line_Total_Inclusive" => (float)$prod->get_total(),
-                "Line_Total_Exclusive" => (float)$prod->get_total() / 1.15,
+                "Line_Total_Exclusive" => (float)number_format($prod->get_total() / 1.15, 2, '.', ''),
                 "Custom_Cost"          => 0,
                 "List_Price"           => (float)get_post_meta($prod_id, '_regular_price', true),
                 "Invoiced_Quantity"    => 0
@@ -566,27 +572,36 @@ function iq_sync_orders() {
         iq_logger('order_sync', 'Retrieving shipping data and adding to product data array.', strtotime('now'));
 
         // retrieve shipping
-        $shipping = $order->get_items('shipping');
+        $shipping      = $order->get_items('shipping');
         $shipping_name = '';
         $shipping_cost = '';
+
         foreach ($shipping as $ship_id => $item) :
+
             $shipping_name = $item->get_name();
-            $shipping_cost = (float)$item->get_total();
+
+            // if ZA order, add VAT, else not
+            if ($order->get_shipping_country() === 'ZA') :
+                $shipping_cost = (float)$item->get_total() * 1.15;
+            else :
+                $shipping_cost = (float)$item->get_total();
+            endif;
+
         endforeach;
 
         // push shipping cost to $order_items array
         $order_items[] = [
-            "stock_code"        => "H020",
-            "stock_description" => "",
-            "comment"           => "Shipping cost",
-            "quantity"          => 1,
-            "item_price_inclusive" => (float)$shipping_cost,
-            "item_price_exclusive" => (float)$shipping_cost / 1.15,
+            "stock_code"           => "H020",
+            "stock_description"    => "",
+            "comment"              => "Shipping cost",
+            "quantity"             => 1,
+            "item_price_inclusive" => (float)number_format($shipping_cost, 2, '.', ''),
+            "item_price_exclusive" => $order->get_shipping_country() === 'ZA' ? (float)number_format($shipping_cost / 1.15, 2, '.', '') : (float)number_format($shipping_cost, 2, '.', ''),
             "discount_percentage"  => 0,
-            "line_total_inclusive" => (float)$shipping_cost, 2,
-            "line_total_exclusive" => (float)$shipping_cost / 1.15,
+            "line_total_inclusive" => (float)number_format($shipping_cost, 2, '.', ''),
+            "line_total_exclusive" => $order->get_shipping_country() === 'ZA' ? (float)number_format($shipping_cost / 1.15, 2, '.', '') : (float)number_format($shipping_cost, 2, '.', ''),
             "custom_cost"          => 0,
-            "list_price"           => (float)$shipping_cost,
+            "list_price"           => (float)number_format($shipping_cost, 2, '.', ''),
             "delcol"               => "",
             "invoiced_quantity"    => 0
         ];
@@ -610,8 +625,9 @@ function iq_sync_orders() {
         // retrieve discount
         $disc_amount = $order->get_discount_total();
 
-        // work out discount percentage if applicable
-        $disc_perc = $disc_amount > 0 ? 1 / ($order_total / $disc_amount) * 100 : 0;
+        // work out discount percentage if applicable (HAVE to use order subtotal as no discounts have been applied to it - fix applied 28 April 2023)
+        $order_subtotal = $order->get_subtotal();
+        $disc_perc = $disc_amount > 0 ? 1 / ($order_subtotal / $disc_amount) * 100 : 0;
 
         // figure out discount type (coupon vs whatever else)
         $coupons = $order->get_coupons();
@@ -652,7 +668,7 @@ function iq_sync_orders() {
         $base_order_data = [
             "Export_Class" => "Sales_Order",
             "Document"     => [
-                "Document_Number"              => $order_id,
+                "Document_Number"              => '',
                 "Delivery_Address_Information" => [
                     $deladdy1,
                     $deladdy2,
@@ -665,12 +681,12 @@ function iq_sync_orders() {
                 "Order_Number"              => $order_id,
                 "Delivery_Method"           => $shipping_name,
                 "Delivery_Note_Number"      => "",
-                "Total_Vat"                 => (float)$vat_amt,
+                "Total_Vat"                 => (float)number_format($vat_amt, 2, '.', ''),
                 "Discount_Percentage"       => (float)$disc_perc,
                 "Discount_Type"             => $discount_type,
-                "Discount_Amount"           => (float)$disc_amount,
+                "Discount_Amount"           => (float)number_format($disc_amount, 2, '.', ''),
                 "Long_Description"          => $long_descr,
-                "Document_Total"            => (float)$order_total,
+                "Document_Total"            => (float)number_format($order_total, 2, '.', ''),
                 "Total_Number_Of_Items"     => (int)$order->get_item_count('line-item'),
                 "Document_Description"      => "",
                 "Print_Layout"              => 1,

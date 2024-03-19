@@ -202,9 +202,9 @@ function iq_sync_order() {
 
         // push line items to $order_items array
         $order_items[] = [
-            "Stock_Code"  => get_post_meta($prod_id, '_sku', true),
-            "Comment"     => $prod->get_name(),
-            "Quantity"    => (int)$prod->get_quantity(),
+            "Stock_Code"           => get_post_meta($prod_id, '_sku', true),
+            "Comment"              => $prod->get_name(),
+            "Quantity"             => (int)$prod->get_quantity(),
             "Item_Price_Inclusive" => (float)get_post_meta($prod_id, '_regular_price', true),
             "Item_Price_Exclusive" => (float)number_format(get_post_meta($prod_id, '_regular_price', true) / 1.15, 2, '.', ''),
             "Discount_Percentage"  => 0,
@@ -218,25 +218,34 @@ function iq_sync_order() {
     endforeach;
 
     // retrieve shipping
-    $shipping = $order->get_items('shipping');
+    $shipping      = $order->get_items('shipping');
     $shipping_name = '';
     $shipping_cost = '';
+
     foreach ($shipping as $ship_id => $item) :
+
         $shipping_name = $item->get_name();
-        $shipping_cost = (float)$item->get_total();
+
+        // if ZA order, add VAT, else not
+        if ($order->get_shipping_country() === 'ZA') :
+            $shipping_cost = (float)$item->get_total() * 1.15;
+        else :
+            $shipping_cost = (float)$item->get_total();
+        endif;
+
     endforeach;
 
     // push shipping cost to $order_items array
     $order_items[] = [
-        "stock_code"        => "H020",
-        "stock_description" => "",
-        "comment"           => "Shipping cost",
-        "quantity"          => 1,
+        "stock_code"           => "H020",
+        "stock_description"    => "",
+        "comment"              => "Shipping cost",
+        "quantity"             => 1,
         "item_price_inclusive" => (float)number_format($shipping_cost, 2, '.', ''),
-        "item_price_exclusive" => (float)number_format($shipping_cost / 1.15, 2, '.', ''),
+        "item_price_exclusive" => $order->get_shipping_country() === 'ZA' ? (float)number_format($shipping_cost / 1.15, 2, '.', '') : (float)number_format($shipping_cost, 2, '.', ''),
         "discount_percentage"  => 0,
         "line_total_inclusive" => (float)number_format($shipping_cost, 2, '.', ''),
-        "line_total_exclusive" => (float)number_format($shipping_cost / 1.15, 2, '.', ''),
+        "line_total_exclusive" => $order->get_shipping_country() === 'ZA' ? (float)number_format($shipping_cost / 1.15, 2, '.', '') : (float)number_format($shipping_cost, 2, '.', ''),
         "custom_cost"          => 0,
         "list_price"           => (float)number_format($shipping_cost, 2, '.', ''),
         "delcol"               => "",
@@ -244,13 +253,15 @@ function iq_sync_order() {
     ];
 
     // retrieve delivery address info
-    $deladdy1 = $order->get_shipping_address_1();
-    $deladdy2 = $order->get_shipping_address_2();
-    $delcity  = $order->get_shipping_city();
-    $delprov  = $order->get_shipping_state();
-    $delpcode = $order->get_shipping_postcode();
-    $delphone = $order->get_shipping_phone();
-    $delemail = $order->get_billing_email();
+    $deladdy1   = $order->get_shipping_address_1();
+    $deladdy2   = $order->get_shipping_address_2();
+    $delsuburb  = get_post_meta($order_id, '_shipping_suburb', true) ? get_post_meta($order_id, '_shipping_suburb', true) : 'No suburb provided';
+    $delcity    = $order->get_shipping_city();
+    $delprov    = $order->get_shipping_state();
+    $delpcode   = $order->get_shipping_postcode();
+    $delphone   = $order->get_shipping_phone();
+    $delemail   = $order->get_billing_email();
+    $delcountry = $order->get_shipping_country();
 
     // retrieve order total
     $order_total = $order->get_total();
@@ -258,11 +269,12 @@ function iq_sync_order() {
     // retrieve discount
     $disc_amount = $order->get_discount_total();
 
-    // work out discount percentage if applicable
-    $disc_perc = $disc_amount > 0 ? number_format(1 / ($order_total / $disc_amount) * 100, 2, '.', '') : 0;
+    // work out discount percentage if applicable (HAVE to use order subtotal as no discounts have been applied to it - fix applied 28 April 2023)
+    $order_subtotal = $order->get_subtotal();
+    $disc_perc      = $disc_amount > 0 ? 1 / ($order_subtotal / $disc_amount) * 100 : 0;
 
     // figure out discount type (coupon vs whatever else)
-    $coupons = $order->get_coupons();
+    $coupons       = $order->get_coupons();
     $discount_type = !empty($coupons) ? 'Coupon(s)' : 'Unknown';
 
     // retrieve order currency
@@ -274,8 +286,25 @@ function iq_sync_order() {
     // vat included or not
     $vat_inc = $order->get_shipping_country() == 'ZA' ? true : false;
 
-    // setup bookpack description if application
-    $long_descr = get_post_meta($order_id, 'bookpack_id', true) ? get_the_title(get_post_meta($order_id, 'bookpack_id', true)) : '';
+    // setup bookpack order long description if bookpack_id is present
+    $long_descr = '';
+
+    if (get_post_meta($order_id, 'bookpack_id', true)) :
+
+        iq_logger('order_sync_manual', 'Bookpack and associated student meta found in order. Generating bookpack meta long description...', strtotime('now'));
+
+        // get bookpack id
+        $bookpack_id = get_post_meta($order_id, 'bookpack_id', true);
+
+        // build bookpack long description
+        $long_descr .= 'Bookpack: ' . get_the_title($bookpack_id) . PHP_EOL;
+        $long_descr .= 'Pupil Name: ' . get_post_meta($order_id, 'pupil_name', true) . PHP_EOL;
+        $long_descr .= 'Pupil School: ' . get_post_meta($order_id, 'pupil_school', true) . PHP_EOL;
+        $long_descr .= 'Pupil Grade: ' . get_post_meta($order_id, 'pupil_grade', true) . PHP_EOL;
+
+        iq_logger('order_sync_manual', 'Bookpack meta long description generated.', strtotime('now'));
+
+    endif;
 
     // setup base order data array
     $base_order_data = [
@@ -285,8 +314,10 @@ function iq_sync_order() {
             "Delivery_Address_Information" => [
                 $deladdy1,
                 $deladdy2,
+                $delsuburb,
                 $delcity,
-                WC()->countries->get_states($order->get_shipping_country())[$delprov]
+                WC()->countries->get_states($order->get_shipping_country())[$delprov],
+                $delcountry
             ],
             "Email_Address"             => $delemail,
             "Order_Number"              => $order_id,
@@ -372,6 +403,8 @@ function iq_sync_order() {
 
     $msg = '';
 
+    $response_json = curl_exec($curl);
+
     // if request fails, send error message back and log
     if ($response_json !== false) :
 
@@ -388,15 +421,15 @@ function iq_sync_order() {
 
                 $msg = 'Response code other than 200 returned: ' . $response['response_code'];
 
-                iq_logger('order_sync_manual', 'Response code other than 200 returned: ' . $response['response_code'] . '.', strtotime('now'));
+                iq_logger('order_sync_manual', 'Response code other than 200 returned: ' . $response['response_code'] . '. Moving on to next order.', strtotime('now'));
 
                 // add order note
-                $order->add_order_note('<b>Order manual sync request error (code: ' . $response['response_code'] . ') :</b></br> ' . $response['response_message']);
+                $order->add_order_note('<b>Order auto sync request error (code: ' . $response['response_code'] . ') :</b></br> ' . $response['response_message']);
                 $order->save();
 
                 iq_logger('order_sync_manual', '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', strtotime('now'));
 
-                
+
             endif;
 
             // find document number 
@@ -404,10 +437,10 @@ function iq_sync_order() {
 
             if ($doc_number !== '') :
 
+                $msg = 'Order successfully synced to IQ. IQ document number: ' . $doc_number;
+
                 // save document number to order meta
                 update_post_meta($order_id, '_iq_doc_number', $doc_number);
-
-                $msg = 'Order successfully synced to IQ. IQ document number: ' . $doc_number;
 
                 // add order note
                 $order->add_order_note('<b>Order successfully synced to IQ.<br> IQ document number:</b><br> ' . $doc_number);
@@ -421,14 +454,14 @@ function iq_sync_order() {
                 $msg = 'Order synced to IQ, but no Document Number returned. Please try to sync again, or check IQ to see if order synced successfully';
 
                 // add order note
-                $order->add_order_note('<b>Order synced to IQ, but no Document Number returned. Please try to sync again, or check IQ to see if order synced successfully</b>');
+                $order->add_order_note('<b>Order synced to IQ, but no Document Number returned. Please try to sync again, or check IQ to see if order synced successfully');
                 $order->save();
 
                 iq_logger('order_sync_manual', 'Order ID ' . $order_id . ' successfully synced to IQ, but no or empty Document Number returned. Continuing to next order.', strtotime('now'));
 
                 iq_logger('order_sync_manual', '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', strtotime('now'));
 
-                
+
 
             endif;
 
@@ -438,7 +471,7 @@ function iq_sync_order() {
             if (!isset($response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data'])) :
 
                 // base err msg
-                $err_msg = '<b><u>MANUAL IQ SYNC FAILURE</u></b><br>';
+                $err_msg = '<b><u>AUTO IQ SYNC FAILURE</u></b><br>';
                 $err_msg = '<b>This order could not be synced to IQ due to the following error(s) returned by IQ during the sync process:</b><br>';
 
                 // retrieve error data
@@ -480,7 +513,6 @@ function iq_sync_order() {
                     iq_logger('order_sync_manual', 'IQ error message: ' . $err_data['err_desc'], strtotime('now'));
                 endforeach;
 
-                iq_logger('order_sync_manual', 'Moving on to next order.', strtotime('now'));
                 iq_logger('order_sync_manual', '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', strtotime('now'));
 
             elseif (isset($response['iq_api_error'][0]['iq_error_data']['iq_error_data_items'][0]['iq_error_extended_data']['iq_root_json']['error_data'][0]['items'])) :
@@ -492,8 +524,8 @@ function iq_sync_order() {
                 // 
 
                 // base err msg
-                $err_msg = '<b><u>MANUAL IQ SYNC FAILURE</u></b><br> ';
-                $err_msg = '<b>This order could not be synced to IQ due to the following error(s) returned by IQ during the sync process:</b><br> ';
+                $err_msg = '<b><u>AUTO IQ SYNC FAILURE</u></b><br>';
+                $err_msg = '<b>This order could not be synced to IQ due to the following error(s) returned by IQ during the sync process:</b><br>';
 
                 // errors arr
                 $errors = [];
@@ -501,7 +533,6 @@ function iq_sync_order() {
                 // loop through err are to retrieve product data and associated errors and push to $errors
                 foreach ($error_arr as $item) :
                     if (!empty($item['errors'])) :
-
                         $errors[] = [
                             'stock_code' => isset($item['stock_code']) ? $item['stock_code'] : 'SKU not defined on WooCommerce',
                             'prod_title' => $item['comment'],
@@ -514,10 +545,23 @@ function iq_sync_order() {
 
                 // loop through $errors and compile error msg
                 foreach ($errors as $err_data) :
-                    $err_msg .= '<u><b>SKU:</b></u> ' . $err_data['stock_code'] . '<br> ';
-                    $err_msg .= '<u><b>Product title:</b></u> ' . $err_data['prod_title'] . '<br> ';
-                    $err_msg .= '<u><b>IQ error code:</b></u> ' . $err_data['err_code'] . '<br> ';
-                    $err_msg .= '<u><b>IQ error message:</b></u> ' . $err_data['err_desc'] . '<br> ';
+
+                    $stock_code = $err_data['stock_code'];
+                    $prod_title = $err_data['prod_title'];
+                    $err_code   = $err_data['err_code'];
+                    $err_desc   = $err_data['err_desc'];
+
+                    // log product issues to separate file
+                    iq_logger('order_product_issues', 'SKU: ' . $stock_code, strtotime('now'));
+                    iq_logger('order_product_issues', 'Product title: ' . $prod_title, strtotime('now'));
+                    iq_logger('order_product_issues', 'IQ error code: ' . $err_code, strtotime('now'));
+                    iq_logger('order_product_issues', 'IQ error message: ' . $err_desc, strtotime('now'));
+
+                    $err_msg .= '<u><b>SKU:</b></u> ' . $stock_code . '<br>';
+                    $err_msg .= '<u><b>Product title:</b></u> ' . $prod_title . '<br>';
+                    $err_msg .= '<u><b>IQ error code:</b></u> ' . $err_code . '<br>';
+                    $err_msg .= '<u><b>IQ error message:</b></u> ' . $err_desc . '<br>';
+
                 endforeach;
 
                 $err_msg .= '<b>Please rectify these errors on IQ before attempting to sync again.</b>';

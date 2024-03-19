@@ -47,6 +47,11 @@ function iq_retail_rest() {
                         schedule order sync to IQ
                     </a>
 
+                    <!-- schedule stock check -->
+                    <a href="" id="iq-schedule-stock-check" style="text-transform: uppercase;" class="button button-primary button-medium disabled" title="please fill in all settings below first">
+                        schedule stock discrepancy check
+                    </a>
+
                 </span>
             <?php else : ?>
 
@@ -75,6 +80,11 @@ function iq_retail_rest() {
                     <!-- schedule order sync -->
                     <a href="" id="iq-schedule-order-sync" style="text-transform: uppercase;" class="button button-primary button-medium" title="click to manually sync new orders to IQ">
                         schedule order sync to IQ
+                    </a>
+                    
+                    <!-- schedule stock check -->
+                    <a href="" id="iq-schedule-stock-check" style="text-transform: uppercase;" class="button button-primary button-medium" title="click to schedule a stock discrepancy check between woo and IQ">
+                        schedule stock discrepancy check
                     </a>
 
                 </span>
@@ -382,6 +392,25 @@ function iq_retail_rest() {
                     $('#iq-reset-orders').text('Reset Order Meta');
                 });
 
+            });
+
+            // schedule stock discrepancy check
+            $('#iq-schedule-stock-check').click(function (e) { 
+                e.preventDefault();
+
+                $(this).text('Working...');
+
+                var data = {
+                    'action': 'iq_schedule_stock_check',
+                    '_ajax_nonce': '<?php echo wp_create_nonce('iq schedule stock check') ?>'
+                };
+
+                $.post(ajaxurl, data, function(response) {
+                    alert(response);
+                    $('#iq-schedule-stock-check').text('Schedule Stock Discrepancy Check');
+                });
+
+                
             });
         });
     </script>

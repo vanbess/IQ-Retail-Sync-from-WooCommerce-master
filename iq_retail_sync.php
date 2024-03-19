@@ -47,6 +47,9 @@ add_action('init', function () {
     include IQ_RETAIL_PATH . 'inc/push/schedule/orders/iq_manual_sync_orders.php';
     include IQ_RETAIL_PATH . 'inc/push/schedule/users/iq_auto_sync_users.php';
     include IQ_RETAIL_PATH . 'inc/push/schedule/users/iq_manual_sync_users.php';
+    
+    // stock discrepancy test (added 17 March 2023)
+    include IQ_RETAIL_PATH . 'inc/stock-discrepencies/stock-discrep.php';
 
     /**
      * Logger - logs sync progress
